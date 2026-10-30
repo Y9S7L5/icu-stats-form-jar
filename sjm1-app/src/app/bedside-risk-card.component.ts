@@ -1,9 +1,9 @@
 /**
  * 床头卡危险风险标识 —— Angular 组件
  * 访问路径：/form/bedsideRiskCardForm
- * 通过握手机制（HostPatientService）获取当前患者，按评估结果动态渲染风险标识列：
- * 仅有风险的列才出现，列序固定。卡面仅风险标识区（不含患者信息）。
- * 打印：前端浏览器打印，A4 纵向，卡片为半张 A4（210mm × 148.5mm），每张 A4 默认出 2 张。
+ * 通过握手机制（HostPatientService）获取当前患者，按评估结果动态填充风险标识表格：
+ * 卡面为 5 列 × 2 行黑框表格，(1,1) 固定特级护理（红底黑字），其余单元格按风险顺序填充。
+ * 打印：前端浏览器打印，A4 纵向，卡片为半张 A4（210mm × 148.5mm），占上半页。
  * 风险判定逻辑后续由业务确认，当前为默认占位实现（见 buildRiskFlags）。
  */
 import { HttpClient } from '@angular/common/http';
@@ -12,23 +12,30 @@ import { forkJoin, Observable, of, Subject } from 'rxjs';
 import { catchError, distinctUntilChanged, filter, finalize, map, retry, switchMap, takeUntil, tap } from 'rxjs/operators';
 import { HostPatientService } from './services/host-patient.service';
 
-/** 风险列定义（列序固定） */
+/** 风险列定义（填充顺序固定） */
 interface RiskDef {
   code: string;
   label: string;
-  /** 评分类型；null = 数据源待定（TODO），暂不参与评估、不渲染 */
+  /** 评分类型；null = 数据源待定（TODO），暂不参与评估、不填充 */
   scoreType: string | null;
   /** 判定关键词：最新有效记录的 conclusion 包含任一即有风险 */
   keywords: string[];
 }
 
 const RISK_DEFS: RiskDef[] = [
-  { code: 'specialCare', label: '特级护理', scoreType: null, keywords: [] }, // TODO 数据源待定
+  { code: 'specialCare', label: '特级护理', scoreType: null, keywords: [] }, // TODO 数据源待定，当前固定占位 (1,1)
   { code: 'fallDanger', label: '跌倒', scoreType: 'patientFallDangerLJRMYY', keywords: ['高'] },
   { code: 'pressureInjury', label: '压疮', scoreType: 'bradenScore', keywords: ['高'] },
   { code: 'tubeSlip', label: '管道滑脱', scoreType: 'unPlannedCGZYYScore', keywords: ['高'] },
   { code: 'suicide', label: '自杀', scoreType: 'commitSuicideScore', keywords: ['高'] },
 ];
+
+/** 表格规格：5 列 × 2 行，共 10 格 */
+const TABLE_COLS = 5;
+const TABLE_ROWS = 2;
+const TABLE_CELLS = TABLE_COLS * TABLE_ROWS;
+/** (1,1) 默认内容 */
+const DEFAULT_CELL = '特级护理';
 
 /** 渲染到卡面的风险标识 */
 interface RiskFlag {
@@ -49,33 +56,26 @@ interface ScoreRecord {
   template: `
     <div class="card-wrapper">
       <div class="toolbar no-print">
-        <span class="copies-field">
-          <label>每张A4份数：</label>
-          <select [(ngModel)]="copies">
-            <option [ngValue]="1">1（仅上半页）</option>
-            <option [ngValue]="2">2（整页两张）</option>
-          </select>
-        </span>
         <button class="btn" type="button" (click)="print()" [disabled]="loading || !patient">打印</button>
       </div>
 
       <div class="wait-hint no-print" *ngIf="!patient">等待患者信息（握手机制）…</div>
       <div class="loading no-print" *ngIf="loading">风险评估加载中…</div>
       <div class="wait-hint no-print" *ngIf="patient && loaded && !loading && riskFlags.length === 0">
-        当前患者未识别到风险标识，仍可打印（卡面为空白标识区）。
+        当前患者未识别到风险标识。
       </div>
 
       <div class="preview" *ngIf="patient">
-        <div class="preview-label no-print">A4 纵向 · 每张卡片 = 半页（210mm × 148.5mm），沿中线裁开</div>
-        <div class="card" *ngFor="let i of cardSlots">
-          <div class="strip" *ngIf="riskFlags.length > 0">
-            <div class="risk-col" *ngFor="let f of riskFlags">
-              <span class="risk-label">{{ f.label }}</span>
-            </div>
-          </div>
-          <div class="empty-strip" *ngIf="riskFlags.length === 0">
-            <span class="no-risk print-hidden">无风险标识</span>
-          </div>
+        <div class="card">
+          <table class="risk-table">
+            <tbody>
+              <tr *ngFor="let row of cellRows">
+                <td *ngFor="let cell of row" [class.filled]="!!cell">
+                  <span class="label" *ngIf="cell">{{ cell }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -86,87 +86,70 @@ interface ScoreRecord {
       display: flex; justify-content: flex-end; align-items: center; gap: 16px;
       padding: 8px 12px; background: #f5f7fa; border-bottom: 1px solid #e2e8f0;
     }
-    .copies-field label { font-size: 13px; color: #334155; }
-    .copies-field select { font-size: 13px; padding: 3px 6px; }
     .btn {
       padding: 6px 24px; font-size: 14px; cursor: pointer;
       background: #2563eb; color: #fff; border: none; border-radius: 4px;
     }
     .btn:disabled { cursor: not-allowed; opacity: .55; }
     .wait-hint, .loading { padding: 28px; text-align: center; color: #64748b; font-size: 14px; }
-    .preview { padding: 16px 0; display: flex; flex-direction: column; align-items: center; }
-    .preview-label { color: #94a3b8; font-size: 12px; margin-bottom: 8px; }
+    .preview { padding: 16px 0; display: flex; justify-content: center; }
 
-    /* 卡片 = 半张 A4（210mm × 148.5mm） */
+    /* 卡片 = 半张 A4（210mm × 148.5mm），黑色边框，距顶 5mm */
     .card {
       box-sizing: border-box;
       width: 210mm; height: 148.5mm;
-      padding: 12mm 14mm;
+      padding: 5mm;
       background: #fff;
-      border: 1px dashed #cbd5e1;      /* 屏幕参考边线（打印隐藏） */
-      display: flex; align-items: center;
+      border: 1.5px solid #000;
       overflow: hidden;
     }
 
-    /* 风险标识条：外框 + 列间竖分隔线 + 横贯分隔线（复刻手绘版式） */
-    .strip {
+    /* 5 列 × 2 行风险标识表格 */
+    .risk-table {
       box-sizing: border-box;
-      position: relative;
-      display: flex;
-      width: 100%; height: 112mm;
-      border: 3px solid #d32f2f;
+      width: 100%; height: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
     }
-    .strip::after {
-      content: '';
-      position: absolute; left: 0; right: 0; top: 45%;
-      border-top: 2.5px solid #d32f2f;
-      pointer-events: none;
-    }
-    .risk-col {
+    .risk-table td {
       box-sizing: border-box;
-      flex: 0 0 38mm;                 /* 列宽固定，左侧排列，余量留白（右侧可扩展） */
-      border-right: 2.5px solid #d32f2f;
-      display: flex; justify-content: center;
-      padding-top: 6mm;
+      width: 20%; height: 50%;
+      border: 1.5px solid #000;
+      text-align: center; vertical-align: middle;
+      padding: 0;
     }
-    .risk-col:last-child { border-right: none; }
-    .risk-label {
+    .risk-table td.filled { background: #d32f2f; }
+    .risk-table td .label {
       writing-mode: vertical-rl;
       text-orientation: upright;
       font-family: 'SimHei', '黑体', sans-serif;
-      font-size: 24pt; font-weight: 700; line-height: 1.15;
-      color: #c62828;
+      font-size: 24pt; font-weight: 700; line-height: 1.2;
+      color: #000;                     /* 字体黑色 */
       letter-spacing: 0.2em;
       white-space: nowrap;
     }
-
-    .empty-strip {
-      box-sizing: border-box;
-      width: 100%; height: 112mm;
-      border: 3px solid #d32f2f;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .no-risk { color: #94a3b8; font-size: 18pt; letter-spacing: 0.3em; }
 
     @media print {
       @page { size: A4 portrait; margin: 0; }
       :host { display: block; width: auto; margin: 0 !important; padding: 0 !important; overflow: visible; }
       .no-print { display: none !important; }
-      .print-hidden { display: none !important; }
       .preview { padding: 0 !important; display: block !important; }
-      .preview-label { display: none !important; }
       .card {
         box-sizing: border-box;
         width: 210mm !important; height: 148.5mm !important;
-        margin: 0 !important; padding: 12mm 14mm !important;
-        border: none !important; box-shadow: none !important;
+        margin: 0 !important; padding: 5mm !important;
+        border: 1.5px solid #000 !important; box-shadow: none !important;
         overflow: hidden !important;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact; /* 红底需随打印输出 */
         page-break-after: always; break-after: page;
       }
       .card:last-of-type { page-break-after: auto; break-after: auto; }
-      .strip, .empty-strip { border-color: #d32f2f !important; }
-      .strip::after { border-top-color: #d32f2f !important; }
-      .risk-label { color: #c62828 !important; }
+      .risk-table td { border: 1.5px solid #000 !important; }
+      .risk-table td.filled {
+        background: #d32f2f !important;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .risk-table td .label { color: #000 !important; }
     }
   `],
 })
@@ -178,8 +161,6 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
   loading = false;
   loaded = false;
   riskFlags: RiskFlag[] = [];
-  /** 每张 A4 打印份数（半页一张，最多两张） */
-  copies = 2;
 
   constructor(
     private readonly http: HttpClient,
@@ -205,8 +186,20 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  get cardSlots(): number[] {
-    return Array.from({ length: this.copies }, (_, i) => i);
+  /**
+   * 表格单元格（5×2=10 格）：
+   * (1,1) 固定默认「特级护理」，其余按风险标识顺序从左到右、从上到下填充，空格留白。
+   * TODO: 后续业务逻辑可能按需隐藏/替换默认格。
+   */
+  get cellRows(): (string | null)[][] {
+    const cells: (string | null)[] = [DEFAULT_CELL, ...this.riskFlags.map(f => f.label)];
+    while (cells.length < TABLE_CELLS) cells.push(null);
+    const flat = cells.slice(0, TABLE_CELLS);
+    const rows: (string | null)[][] = [];
+    for (let r = 0; r < TABLE_ROWS; r++) {
+      rows.push(flat.slice(r * TABLE_COLS, (r + 1) * TABLE_COLS));
+    }
+    return rows;
   }
 
   print(): void { window.print(); }
