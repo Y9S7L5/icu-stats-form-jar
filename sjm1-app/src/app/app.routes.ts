@@ -23,6 +23,7 @@ import { UnplannedExtubationComponent } from './unplanned-extubation.component';
 import { PrintCenterComponent } from './print-center.component';
 import { IcuFormViewerComponent } from './icu-form-viewer.component';
 import { SggrfkcsFormComponent } from './sggrfkcs-form.component';
+import { BedsideRiskCardComponent } from './bedside-risk-card.component';
 
 export const routes: Routes = [
   { path: 'getIcuForm', component: IcuFormViewerComponent },
@@ -49,6 +50,7 @@ export const routes: Routes = [
   { path: 'temperatureRecord', component: TemperatureRecordComponent },
   { path: 'unPlannedCGZYYForm', component: UnplannedExtubationComponent },
   { path: 'sggrfkcsForm', component: SggrfkcsFormComponent },
+  { path: 'bedsideRiskCardForm', component: BedsideRiskCardComponent },
   { path: 'printCenter', component: PrintCenterComponent },
   { path: '', redirectTo: 'getIcuForm', pathMatch: 'full' },
 ];
