@@ -698,13 +698,14 @@ public final class HljldUtils {
 
     /**
      * 统一 valid/status 过滤。
-     * 只保留 valid=true 且 status != invalid 的记录
+     * 与前端 isValidBusinessRecord 保持一致：仅排除 valid=false，字段缺失视为有效。
+     * 若要求 valid 必须为 true，会丢失 valid 字段缺失的记录（如急救/复苏等快捷录入），
+     * 导致表单显示而打印缺失。
      */
     public static boolean isValidBusinessRecord(Document record) {
         if (record == null) return false;
         Object valid = record.get("valid");
-        // 只保留 valid=true 的记录（valid 为 null 或 false 都排除）
-        if (!Boolean.TRUE.equals(valid)) return false;
+        if (Boolean.FALSE.equals(valid)) return false;
         String status = strOrNull(record, "status");
         if ("invalid".equalsIgnoreCase(status)) return false;
         return true;
@@ -712,13 +713,12 @@ public final class HljldUtils {
 
     /**
      * 统一 valid/status 过滤（Map 版本）。
-     * 只保留 valid=true 且 status != invalid 的记录
+     * 与前端一致：仅排除 valid=false，字段缺失视为有效。
      */
     public static boolean isValidBusinessRecord(Map<?, ?> record) {
         if (record == null) return false;
         Object valid = record.get("valid");
-        // 只保留 valid=true 的记录（valid 为 null 或 false 都排除）
-        if (!Boolean.TRUE.equals(valid)) return false;
+        if (Boolean.FALSE.equals(valid)) return false;
         Object statusObj = record.get("status");
         if (statusObj != null && "invalid".equalsIgnoreCase(String.valueOf(statusObj).trim())) return false;
         return true;
