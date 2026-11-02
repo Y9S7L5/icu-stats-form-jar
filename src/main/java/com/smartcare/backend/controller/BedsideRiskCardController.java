@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.*;
  * 床头卡危险风险标识 —— 补充数据接口。
  * 前端 bedside 已有 /api/v1/icu/bedside/listByPid 可取各风险评分最新值；
  * 本接口补齐无法从 bedside 集合直接获得的两类数据：
- * 1. 过敏史：主库 dFormData（入院/转入护理评估单），最新一条有效记录的 gms1/gms4；
- * 2. 解除隔离：DataCenter 库 VI_ICU_ZYYZ（医嘱集合），最新一条 orderName 含"解除隔离"的医嘱，
+ * 1. 过敏史：主库 dFormData（入院/转入护理评估单成对生成），任一条 gms1 含"you"即有过敏史，详情取对应记录的 gms4；
+ * 2. 接触隔离：DataCenter 库 VI_ICU_ZYYZ（医嘱集合），最新一条 orderName 含"接触隔离"的医嘱，
  *    无停止时间或停止时间未到 → true（红底），停止时间已过 → false（灰底），重新开立自然以最新为准。
  */
 @RestController
@@ -42,13 +42,14 @@ public class BedsideRiskCardController {
             @RequestParam(required = false) String mrn) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("allergy", queryAllergy(pid));
-        result.put("removeIsolation", queryRemoveIsolation(pid, mrn));
+        result.put("contactIsolation", queryContactIsolation(pid, mrn));
         return ResponseEntity.ok(result);
     }
 
     /**
-     * 过敏史：取最新一条有效的入院/转入评估单，
-     * gms1 有值即有过敏史；gms4 有值时作为详情文本一并返回。
+     * 过敏史：入院/转入评估单数据库会成对生成，但通常只有一条填了 gms 值。
+     * 两个 formCode 的记录都要判断——任一条 gms1 含"you"（有）即算有过敏史；
+     * 拼接详情只取"声明了过敏史的那条（对应 formCode）"的 gms4（多条时新的优先）。
      */
     private Map<String, Object> queryAllergy(String pid) {
         Map<String, Object> allergy = new LinkedHashMap<>();
@@ -58,23 +59,31 @@ public class BedsideRiskCardController {
             Query query = new Query(Criteria.where("pid").is(pid)
                     .and("formCode").in(ASSESSMENT_FORM_CODES)
                     .and("status").is("valid"));
-            // _id 递增即插入时间递增，取最新一条
+            // _id 递增即插入时间递增，新→旧逐条判断
             query.with(Sort.by(Sort.Direction.DESC, "_id"));
-            query.limit(1);
             List<Map> docs = mongoTemplate.find(query, Map.class, "dFormData");
-            if (docs.isEmpty()) return allergy;
-            Map<?, ?> doc = docs.get(0);
-            Object fieldList = doc.get("fieldDataList");
-            if (!(fieldList instanceof List)) return allergy;
-            for (Object elem : (List<?>) fieldList) {
-                if (!(elem instanceof Map)) continue;
-                Map<?, ?> entry = (Map<?, ?>) elem;
-                String field = String.valueOf(entry.get("field"));
-                if ("gms1".equals(field) && hasValue(entry.get("value"))) {
+            boolean detailSeen = false;
+            for (Map<?, ?> doc : docs) {
+                Object fieldList = doc.get("fieldDataList");
+                if (!(fieldList instanceof List)) continue;
+                Object gms1 = null;
+                Object gms4 = null;
+                for (Object elem : (List<?>) fieldList) {
+                    if (!(elem instanceof Map)) continue;
+                    Map<?, ?> entry = (Map<?, ?>) elem;
+                    String field = String.valueOf(entry.get("field"));
+                    if ("gms1".equals(field)) {
+                        gms1 = entry.get("value");
+                    } else if ("gms4".equals(field)) {
+                        gms4 = entry.get("value");
+                    }
+                }
+                if (hasValue(gms1) && hasAllergyOption(gms1)) {
                     allergy.put("hasAllergy", true);
-                } else if ("gms4".equals(field)) {
-                    String detail = stringifyValue(entry.get("value"));
-                    if (!detail.isEmpty()) allergy.put("detail", detail);
+                    if (!detailSeen && hasValue(gms4)) {
+                        allergy.put("detail", stringifyValue(gms4));
+                        detailSeen = true;
+                    }
                 }
             }
             return allergy;
@@ -85,13 +94,13 @@ public class BedsideRiskCardController {
     }
 
     /**
-     * 解除隔离：取该患者最新一条 orderName 含"解除隔离"的医嘱（作废不计）。
+     * 接触隔离：取该患者最新一条 orderName 含"接触隔离"的医嘱（作废不计）。
      * 无停止时间 或 停止时间未到 → true；停止时间已过 → false。
      */
-    private boolean queryRemoveIsolation(String pid, String mrn) {
+    private boolean queryContactIsolation(String pid, String mrn) {
         try {
             List<Criteria> matchers = new ArrayList<>();
-            matchers.add(Criteria.where("orderName").regex("解除隔离"));
+            matchers.add(Criteria.where("orderName").regex("接触隔离"));
             matchers.add(Criteria.where("status").ne("作废"));
             List<Criteria> patientMatchers = new ArrayList<>();
             patientMatchers.add(Criteria.where("pid").is(pid));
@@ -114,9 +123,24 @@ public class BedsideRiskCardController {
             }
             return false;
         } catch (Exception e) {
-            System.out.println("[BEDSIDE-RISK-CARD] query remove-isolation failed: " + e.getMessage());
+            System.out.println("[BEDSIDE-RISK-CARD] query contact-isolation failed: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 过敏史是否有：gms1 存选项码（单选/多选数组），
+     * 仅当含 "you"（有）选项时才算有过敏史，"wu"（无）及其他均视为无。
+     */
+    private boolean hasAllergyOption(Object val) {
+        if (val == null) return false;
+        if (val instanceof Collection) {
+            for (Object item : (Collection<?>) val) {
+                if (hasAllergyOption(item)) return true;
+            }
+            return false;
+        }
+        return "you".equalsIgnoreCase(String.valueOf(val).trim());
     }
 
     /** 值是否有效：非空字符串 / 非空集合 / 非零数字 / 其他非 null */

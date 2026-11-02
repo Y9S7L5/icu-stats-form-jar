@@ -7,9 +7,9 @@
  *  - R3C1 过敏史 dFormData gms1/gms4   R3C2 防压疮   bedside param_yaChuang_score 最新一条 strVal
  *  - R4C1 饮食   bedside param_biSiLiquid 最新一条   R4C2 防误吸 bedside param_score_mechanicalAspirationRisk 最新一条
  *  - R5C1 VTE    clinicalDiagnosis 含"深静脉血栓"    R5C2 防意外拔管 bedside param_score_unPlannedCGZYY 最新一条
- *  - R6C1 解除隔离 DataCenter VI_ICU_ZYYZ 医嘱        R6C2 空白
+ *  - R6C1 接触隔离 DataCenter VI_ICU_ZYYZ 医嘱        R6C2 空白
  * 风险等级配色：高/极高风险（含高险/高危/高度危险）红底白字、中风险黄底白字、低风险（含低险/低危）绿底白字、未评估灰底白字。
- * 打印：前端浏览器打印，A4 纵向，卡片为半张 A4（210mm × 148.5mm），占上半页。
+ * 打印：前端浏览器打印，A4 纵向，卡片 12cm × 9cm 靠上水平居中，打印后裁剪使用。
  */
 import { HttpClient } from '@angular/common/http';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
@@ -49,7 +49,7 @@ interface BedsideRecord {
 
 interface ExtraInfo {
   allergy?: { hasAllergy?: boolean; detail?: string };
-  removeIsolation?: boolean;
+  contactIsolation?: boolean;
 }
 
 /** 解析 bedside.time（字符串时间戳或日期串）为毫秒数 */
@@ -106,10 +106,10 @@ function parseTimeMs(str: string | undefined): number {
     .wait-hint, .loading { padding: 28px; text-align: center; color: #64748b; font-size: 14px; }
     .preview { padding: 16px 0; display: flex; justify-content: center; }
 
-    /* 卡片 = 半张 A4（210mm × 148.5mm），距顶 5mm；纸张边框不画，只有表格黑框 */
+    /* 卡片 = 12cm × 9cm；纸张边框不画，只有表格黑框 */
     .card {
       box-sizing: border-box;
-      width: 210mm; height: 148.5mm;
+      width: 12cm; height: 9cm;
       padding: 5mm;
       background: #fff;
       overflow: hidden;
@@ -159,8 +159,8 @@ function parseTimeMs(str: string | undefined): number {
       .preview { padding: 0 !important; display: block !important; }
       .card {
         box-sizing: border-box;
-        width: 210mm !important; height: 148.5mm !important;
-        margin: 0 !important; padding: 5mm !important;
+        width: 12cm !important; height: 9cm !important;
+        margin: 10mm auto 0 !important; padding: 5mm !important;
         border: none !important; box-shadow: none !important;
         overflow: hidden !important;
         -webkit-print-color-adjust: exact; print-color-adjust: exact; /* 底色需随打印输出 */
@@ -202,7 +202,7 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    // 主患者流：握手拿到患者后拉取 bedside 参数 + 补充信息（过敏史/解除隔离）
+    // 主患者流：握手拿到患者后拉取 bedside 参数 + 补充信息（过敏史/接触隔离）
     this.hostPatient.patient$.pipe(
       map(p => ({ p, pid: this.getPatientPid(p) })),
       filter(x => !!x.pid),
@@ -234,7 +234,7 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
       [{ text: '过敏史', level: 'gray' }, blank()],               // R3C1 过敏史；R3C2 防压疮
       [{ text: '饮食', level: 'gray' }, blank()],                 // R4C1 饮食；R4C2 防误吸
       [{ text: 'VTE', level: 'gray' }, blank()],                  // R5C1 VTE；R5C2 防意外拔管
-      [{ text: '解除隔离', level: 'gray' }, blank()],             // R6C1 解除隔离；R6C2 空白
+      [{ text: '接触隔离', level: 'gray' }, blank()],             // R6C1 接触隔离；R6C2 空白
     ];
   }
 
@@ -291,11 +291,11 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
 
     // R2C2 防跌倒
     cells[1][1] = { text: '防跌倒', level: level('fall') };
-    // R3C1 过敏史：gms1 有值 → 红底；gms4 有值时追加详情（如 过敏史123）
+    // R3C1 过敏史：gms1 含"you"（有）→ 红底；gms4 有值时追加详情（如 过敏史：13）
     const allergy = extra?.allergy;
     const allergyDetail = String(allergy?.detail ?? '').trim();
     if (allergy?.hasAllergy) {
-      cells[2][0] = { text: allergyDetail ? `过敏史${allergyDetail}` : '过敏史', level: 'red' };
+      cells[2][0] = { text: allergyDetail ? `过敏史：${allergyDetail}` : '过敏史', level: 'red' };
     } else {
       cells[2][0] = { text: '过敏史', level: 'gray' };
     }
@@ -311,8 +311,8 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
     cells[4][0] = { text: 'VTE', level: diagnosis.includes('深静脉血栓') ? 'red' : 'gray' };
     // R5C2 防意外拔管
     cells[4][1] = { text: '防意外拔管', level: level('extubation') };
-    // R6C1 解除隔离：医嘱无停止时间/未到期 → 红底
-    cells[5][0] = { text: '解除隔离', level: extra?.removeIsolation ? 'red' : 'gray' };
+    // R6C1 接触隔离：医嘱无停止时间/未到期 → 红底
+    cells[5][0] = { text: '接触隔离', level: extra?.contactIsolation ? 'red' : 'gray' };
     // R6C2 保持空白
 
     this.cells = cells;
