@@ -54,7 +54,18 @@ const FOOT_NOTES = [
 
 interface ScoreRecord { time?: any; scoreType?: string; total?: number; conclusion?: string; valid?: boolean; inputUserId?: string; inputUser?: string; ohter?: string; nurseMeasureList?: any[]; bradenScore?: Record<string, any>; }
 interface BradenRow { time: string; bradenScore: Record<BradenItem['field'], number | null>; total: number | null; risk: string; other: string; nurseMeasureList: any[]; signUserId?: string; signName?: string; }
-interface RenderPage { index: number; rows: BradenRow[]; diagnosis?: string; }
+/** 数据行在页面上的显示片段：整行，或跨页拆行后本页可见的文本窗口 */
+interface RowSegment {
+  row: BradenRow | null;
+  /** 片段起点距行顶的偏移（px）；跨页续行时 >0 */
+  offsetPx: number;
+  heightPx: number;
+  isFirst: boolean;
+  isLast: boolean;
+  /** 整行未拆分（参与行高实测） */
+  isWhole: boolean;
+}
+interface RenderPage { index: number; segments: RowSegment[]; diagnosis?: string; }
 interface FinalExtraData { id: string | null; result: string; resultDate: string; happened: '' | '是' | '否'; loaded: boolean; loading: boolean; }
 
 @Component({
@@ -134,15 +145,19 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let r of pagePaddedRows(page)" [attr.data-row-key]="r ? r.time : ''" [style.height.px]="currentRowHeight">
-              <td class="date-col"><span class="dt-date">{{r ? fmtDate(r.time) : ''}}</span><span class="dt-time">{{r ? fmtTime(r.time) : ''}}</span></td>
+            <!-- 流式分页：一页放满才翻页；行放不下时按「其他」列文本窗口拆行，余下内容下一页顶部续行 -->
+            <tr *ngFor="let seg of page.segments"
+                [attr.data-row-key]="seg.row && seg.isWhole ? seg.row.time : ''"
+                [attr.data-clipped]="seg.row && !seg.isWhole ? '1' : null"
+                [style.height.px]="seg.heightPx">
+              <td class="date-col"><span class="dt-date" *ngIf="seg.row && seg.isFirst">{{fmtDate(seg.row.time)}}</span><span class="dt-time" *ngIf="seg.row && seg.isFirst">{{fmtTime(seg.row.time)}}</span></td>
               <td class="score-index-col"></td>
-              <td *ngFor="let item of BRADEN_ITEMS" class="score-cell" [class.friction-col]="$last">{{r ? bradenValue(r, item.field) : ''}}</td>
-              <td class="total-col">{{r && r.total !== null ? r.total : ''}}</td>
-              <td class="risk-col">{{r ? r.risk : ''}}</td>
-              <ng-container *ngFor="let m of MEASURE_COLUMNS"><td class="measure-cell">{{r ? measureCheck(r, m) : ''}}</td></ng-container>
-              <td class="other-cell">{{r ? r.other : ''}}</td>
-              <td class="sign-col">{{r ? (r.signName || '') : ''}}</td>
+              <td *ngFor="let item of BRADEN_ITEMS" class="score-cell" [class.friction-col]="$last">{{seg.row && seg.isFirst ? bradenValue(seg.row, item.field) : ''}}</td>
+              <td class="total-col">{{seg.row && seg.isFirst && seg.row.total !== null ? seg.row.total : ''}}</td>
+              <td class="risk-col">{{seg.row && seg.isFirst ? seg.row.risk : ''}}</td>
+              <ng-container *ngFor="let m of MEASURE_COLUMNS"><td class="measure-cell">{{seg.row && seg.isFirst ? measureCheck(seg.row, m) : ''}}</td></ng-container>
+              <td class="other-cell"><span class="cell-text" *ngIf="seg.row && seg.row.other" [class.clipped]="!seg.isWhole" [style.height.px]="seg.row && !seg.isWhole ? seg.heightPx : null" [style.marginTop.px]="seg.row && !seg.isWhole ? -seg.offsetPx : null">{{seg.row.other}}</span></td>
+              <td class="sign-col">{{seg.row && seg.isLast ? (seg.row.signName || '') : ''}}</td>
             </tr>
           </tbody>
         </table>
@@ -241,6 +256,7 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
     .measure-cell{width:22px;min-width:22px;font-size:12px}
     .other-col{width:305px;min-width:305px}
     .record-table td.other-cell{width:305px;min-width:305px;text-align:left;padding-left:2px;white-space:pre-wrap;word-break:break-word}
+    .record-table td.other-cell .cell-text.clipped{display:block;overflow:hidden}
     .sign-col{width:44px;min-width:44px}
     .vtext{display:inline-block;writing-mode:vertical-lr;text-orientation:upright;white-space:normal;line-height:10px;letter-spacing:0;font-family:'SimSun','宋体',serif;font-size:10px;font-weight:400;font-style:normal;color:#000;text-shadow:none;text-rendering:auto;-webkit-font-smoothing:auto;transform:none;filter:none;opacity:1;margin:0 auto}
     .dt-date,.dt-time{display:block;white-space:nowrap;word-break:normal;text-align:center;line-height:1.2}
@@ -294,20 +310,23 @@ export class BradenFormComponent implements OnInit, OnDestroy {
   readonly MEASURE_COLUMNS = MEASURE_COLUMNS;
   readonly FOOT_NOTES = FOOT_NOTES;
 
-  /** 单页最大槽位数（也是末页补白下限）：行高正常时的旧行数语义 */
-  readonly maxRowsPerPage = 8;
-  /** 每页数据行数上限（中间页满槽 11；末页可少于 11 但不截断） */
+  /** 每页新起数据行数上限（中间页满槽 11；末页可少于 11 但不截断；跨页续行片段不计入） */
   readonly maxRowsPerPageMultiPage = 11;
   /** 末页空白补白目标行数（数据 <8 时补齐） */
   readonly maxRowsLastPage = 8;
   /** 最小行高（数据行内容超高时按实际高度撑开） */
   readonly baseRowHeight = 35;
-  currentRowHeight = 35;
+  /** 拆行片段最小高度：剩余空间不足该值时直接换页，不硬拆 */
+  private readonly minFragmentPx = 35;
 
   /** 每行实测高度（key=行 time，px）；未测量到的行按 baseRowHeight */
   private rowHeights = new Map<string, number>();
   /** 每页留给数据行的总高度（px）；未测量时为 Infinity，退化为纯行数分页 */
   private availableRowsPx = Number.POSITIVE_INFINITY;
+  /** 「其他」列文本行高（px）；跨页续行的拆行偏移按该值对齐，避免文字被拦腰截断 */
+  private otherLineHeight = 14;
+  /** 末页页脚（结果/备注/审核签名）占高（px）；仅末页预留 */
+  private footerReservedPx = 0;
 
   loading = true;
   patient: any = null;
@@ -438,7 +457,7 @@ export class BradenFormComponent implements OnInit, OnDestroy {
   }
 
   private ensureBlankPage(): void {
-    if (!this.pages.length) { this.pages = [{ index: 1, rows: [], diagnosis: this.diagnosisForRows([]) }]; }
+    if (!this.pages.length) { this.pages = [{ index: 1, segments: [], diagnosis: this.diagnosisForRows([]) }]; }
   }
 
   private normalizeTime(v: any): string {
@@ -775,20 +794,6 @@ export class BradenFormComponent implements OnInit, OnDestroy {
     const list = Array.isArray(row.nurseMeasureList) ? row.nurseMeasureList : [];
     return list.some(m => m && m.value === true && measure.match.some(kw => String(m.code || '').trim().includes(kw))) ? '√' : '';
   }
-  pagePaddedRows(page: RenderPage): (BradenRow | null)[] {
-    const r: (BradenRow | null)[] = page.rows.slice(0, this.maxRowsPerPageMultiPage);
-    // 槽位目标：中间页满槽 11、末页/单页至少 8（旧行数语义），行高变高时按剩余高度自动收窄
-    const isLast = page.index === this.pages.length;
-    const minSlots = isLast ? this.maxRowsLastPage : this.maxRowsPerPageMultiPage;
-    let used = 0;
-    for (const row of r) used += this.rowHeight(row);
-    const freeSlots = Math.floor(Math.max(0, this.availableRowsPx - used) / this.baseRowHeight);
-    const fitSlots = Math.min(this.maxRowsPerPageMultiPage, r.length + freeSlots);
-    const target = Math.min(fitSlots, Math.max(minSlots, r.length));
-    while (r.length < target) r.push(null);
-    return r;
-  }
-
   pageExtra(pageIndex: number): FinalExtraData {
     return this.finalExtra;
   }
@@ -798,13 +803,10 @@ export class BradenFormComponent implements OnInit, OnDestroy {
   }
 
   private paginate(): void {
-    // 行高固定为基础高度，不再按行数压缩（方案B）
-    this.currentRowHeight = this.baseRowHeight;
-
     // 第一遍：按既有行高切页渲染，保证每行都渲染过一次，量得到真实行高
     this.paginateByHeight();
     this.cdr.detectChanges();
-    // 第二遍：实测行高（「其他」列文字换行会撑高行）后按高度重切
+    // 第二遍：实测行高（「其他」列文字换行会撑高行）后按高度重切（放不下拆行续页）
     if (this.measureRealHeights()) {
       this.paginateByHeight();
       this.cdr.detectChanges();
@@ -817,40 +819,158 @@ export class BradenFormComponent implements OnInit, OnDestroy {
     return h && h > 0 ? Math.max(h, this.baseRowHeight) : this.baseRowHeight;
   }
 
-  /** 按行高累计切页：放不下就换页；每页数据行不超过 11 条。
+  /** 构建行显示片段：整行未拆分时 offset=0、height=自然行高 */
+  private makeSegment(row: BradenRow | null, offsetPx: number, heightPx: number, isRowStart: boolean): RowSegment {
+    const natural = row ? this.rowHeight(row) : heightPx;
+    const isLast = !row || offsetPx + heightPx >= natural - 0.5;
+    return {
+      row,
+      offsetPx,
+      heightPx,
+      isFirst: isRowStart,
+      isLast,
+      isWhole: !!row && offsetPx === 0 && isLast,
+    };
+  }
+
+  /** 将 px 向下对齐到「其他」列行高的整数倍，保证续行从整行文本开始，不出现半行 */
+  private snapToLine(px: number): number {
+    const lh = this.otherLineHeight > 0 ? this.otherLineHeight : 14;
+    return Math.floor(px / lh) * lh;
+  }
+
+  /** 贪心装页：整行放不下时按剩余高度拆行，余下片段从下一页顶部继续 */
+  private packPages(pieces: { row: BradenRow; offset: number; height: number }[], avail: number): RowSegment[][] {
+    const pages: RowSegment[][] = [];
+    let cur: RowSegment[] = [];
+    let used = 0;
+    let rowsStarted = 0;
+    const flush = (): void => { if (cur.length) { pages.push(cur); cur = []; used = 0; rowsStarted = 0; } };
+
+    for (const piece of pieces) {
+      let offset = piece.offset;
+      let left = piece.height;
+      let isRowStart = offset === 0;
+      let guard = 0;
+      while (left > 0.5 && guard++ < 1000) {
+        let room = avail - used;
+        if (room < this.minFragmentPx) { flush(); room = avail; }
+        if (isRowStart && rowsStarted >= this.maxRowsPerPageMultiPage) { flush(); room = avail; }
+        if (left <= room + 0.5) {
+          cur.push(this.makeSegment(piece.row, offset, left, isRowStart));
+          used += left;
+          if (isRowStart) { rowsStarted++; }
+          left = 0;
+        } else {
+          const clip = this.snapToLine(room);
+          if (clip < this.minFragmentPx) {
+            if (used === 0) {
+              // 异常兜底：整页都装不下最小片段，整块强放交给 CSS 裁剪
+              cur.push(this.makeSegment(piece.row, offset, left, isRowStart));
+              flush();
+              break;
+            }
+            flush();
+            continue;
+          }
+          cur.push(this.makeSegment(piece.row, offset, clip, isRowStart));
+          used += clip;
+          offset += clip;
+          left -= clip;
+          if (isRowStart) { rowsStarted++; }
+          isRowStart = false;
+          flush(); // 余下内容从下一页顶部继续
+        }
+      }
+    }
+    flush();
+    return pages;
+  }
+
+  /** 末页为「结果/备注/审核签名」预留高度；放不下时把尾部片段移到后续页 */
+  private reserveFooter(pages: RowSegment[][], avail: number, availLast: number): RowSegment[][] {
+    if (!Number.isFinite(availLast)) { return pages; }
+    let guard = 0;
+    while (pages.length && guard++ < 30) {
+      const lastPage = pages[pages.length - 1];
+      let lastUsed = lastPage.reduce((sum, seg) => sum + seg.heightPx, 0);
+      if (lastUsed <= availLast + 0.5) { break; }
+
+      const leftover: { row: BradenRow; offset: number; height: number }[] = [];
+      while (lastPage.length && lastUsed > availLast + 0.5) {
+        const seg = lastPage.pop()!;
+        lastUsed -= seg.heightPx;
+        if (seg.row) { leftover.unshift({ row: seg.row, offset: seg.offsetPx, height: seg.heightPx }); }
+      }
+
+      if (!lastPage.length) {
+        // 单个片段就超过末页可用高度：按 availLast 硬拆
+        const p = leftover.shift();
+        if (!p) { break; }
+        const clip = Math.max(this.snapToLine(availLast), this.baseRowHeight);
+        const h = Math.min(clip, p.height);
+        lastPage.push(this.makeSegment(p.row, p.offset, h, p.offset === 0));
+        if (p.height > h + 0.5) { leftover.unshift({ row: p.row, offset: p.offset + h, height: p.height - h }); }
+      } else if (leftover.length) {
+        // 从弹出的首个片段再回收一段，减少页尾浪费
+        const p = leftover[0];
+        const free = this.snapToLine(availLast - lastUsed);
+        if (free >= this.minFragmentPx && free + 0.5 < p.height) {
+          lastPage.push(this.makeSegment(p.row, p.offset, free, p.offset === 0));
+          leftover[0] = { row: p.row, offset: p.offset + free, height: p.height - free };
+        }
+      }
+
+      if (!leftover.length) { break; }
+      pages.push(...this.packPages(leftover, avail));
+    }
+    return pages;
+  }
+
+  /** 按行高累计切页：一页放满才翻页；放不下先拆行续页；每页新起数据行不超过 11 行。
    *  未测量时 availableRowsPx=Infinity、行高=35px，等价于旧行数分页。 */
   private paginateByHeight(): void {
     if (!this.rows.length) {
-      this.pages = [{ index: 1, rows: [], diagnosis: this.diagnosisForRows([]) }];
+      this.pages = [{ index: 1, segments: [], diagnosis: this.diagnosisForRows([]) }];
       this.normalizeSelectedPrintPages(this.pages.length);
       this.loadFinalExtra();
       return;
     }
 
-    const pages: RenderPage[] = [];
-    let cur: BradenRow[] = [];
-    let used = 0;
-    for (const row of this.rows) {
-      const rh = this.rowHeight(row);
-      const full = cur.length >= this.maxRowsPerPageMultiPage
-        || (cur.length > 0 && used + rh > this.availableRowsPx);
-      if (full) {
-        pages.push({ index: pages.length + 1, rows: cur, diagnosis: this.diagnosisForRows(cur) });
-        cur = [];
-        used = 0;
+    const avail = Number.isFinite(this.availableRowsPx)
+      ? Math.max(this.availableRowsPx, this.minFragmentPx)
+      : Number.POSITIVE_INFINITY;
+    const availLast = Number.isFinite(this.availableRowsPx)
+      ? Math.max(this.availableRowsPx - this.footerReservedPx, this.minFragmentPx)
+      : Number.POSITIVE_INFINITY;
+
+    const pieces = this.rows.map(row => ({ row, offset: 0, height: this.rowHeight(row) }));
+    const pages = this.reserveFooter(this.packPages(pieces, avail), avail, availLast);
+
+    // 末页补白：数据 <8 行且放得下时补齐
+    const last = pages[pages.length - 1];
+    if (last) {
+      let used = last.reduce((sum, seg) => sum + seg.heightPx, 0);
+      while (last.length < this.maxRowsLastPage) {
+        if (Number.isFinite(availLast) && used + this.baseRowHeight > availLast + 0.5) { break; }
+        last.push(this.makeSegment(null, 0, this.baseRowHeight, true));
+        used += this.baseRowHeight;
       }
-      cur.push(row);
-      used += rh;
     }
-    if (cur.length) pages.push({ index: pages.length + 1, rows: cur, diagnosis: this.diagnosisForRows(cur) });
-    this.pages = pages.map((p, i) => ({ ...p, index: i + 1 }));
+
+    this.pages = pages.map((segments, i) => ({
+      index: i + 1,
+      segments,
+      diagnosis: this.diagnosisForRows(segments.map(s => s.row).filter((r): r is BradenRow => !!r)),
+    }));
 
     this.normalizeSelectedPrintPages(this.pages.length);
     this.loadFinalExtra();
   }
 
   /** 从已渲染的真实 DOM 实测行高与固定区高度；量不到返回 false（保留上次结果）。
-   *  行高只取决于内容与列宽，与分页无关，所以任意一页量到的行高都有效。 */
+   *  行高只取决于内容与列宽，与分页无关，所以任意一页量到的行高都有效；
+   *  跨页拆行片段（data-clipped）非自然高度，跳过并沿用旧值。 */
   private measureRealHeights(): boolean {
     const root = this.host.nativeElement as HTMLElement;
     const head = root.querySelector('.sheet-head') as HTMLElement | null;
@@ -858,7 +978,7 @@ export class BradenFormComponent implements OnInit, OnDestroy {
     if (!head || !thead) return false;
 
     const ppm = this.pxPerMm();
-    // 打印页数据行可用高度：A4 横向 209mm - 上下 padding 7mm×2 - 固定区 - 页脚 - 余量
+    // 打印页数据行可用高度：A4 横向 209mm - 上下 padding 7mm×2 - 固定区 - 余量
     const contentPx = (209 - 14) * ppm;
     const safetyPx = 5 * ppm;
     const fixedPx = head.getBoundingClientRect().height + thead.getBoundingClientRect().height;
@@ -866,11 +986,21 @@ export class BradenFormComponent implements OnInit, OnDestroy {
       const el = root.querySelector(sel) as HTMLElement | null;
       return sum + (el ? el.getBoundingClientRect().height : 0);
     }, 0);
-    const available = contentPx - fixedPx - footerPx - safetyPx;
+    const available = contentPx - fixedPx - safetyPx;
     if (!(available > 0)) return false;
+    this.availableRowsPx = available;
+    this.footerReservedPx = footerPx;
+
+    // 「其他」列行高：跨页续行的拆行偏移按该值对齐
+    const otherCell = root.querySelector('.record-table td.other-cell') as HTMLElement | null;
+    if (otherCell) {
+      const lh = parseFloat(getComputedStyle(otherCell).lineHeight);
+      if (Number.isFinite(lh) && lh > 0) this.otherLineHeight = lh;
+    }
 
     const map = new Map<string, number>();
     root.querySelectorAll('tr[data-row-key]').forEach(tr => {
+      if (tr.getAttribute('data-clipped')) return; // 拆行片段非自然高度，沿用旧值
       const key = tr.getAttribute('data-row-key');
       if (!key) return;
       const h = (tr as HTMLElement).getBoundingClientRect().height;
@@ -884,7 +1014,6 @@ export class BradenFormComponent implements OnInit, OnDestroy {
       }
     }
     this.rowHeights = map;
-    this.availableRowsPx = available;
     return true;
   }
 

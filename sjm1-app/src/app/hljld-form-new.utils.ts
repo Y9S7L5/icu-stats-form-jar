@@ -382,6 +382,16 @@ function isRenderableDrugExecution(item: DrugExecution): boolean {
     hasText(drug.name) || parseAmount(drug.liquidAmount) !== 0 || hasText(drug.dose) || hasText(drug.unit));
 }
 
+/**
+ * 执行记录是否含带量的 quickAdd 动作（分次给药行为判定，替代药名白名单）。
+ * 与后端 HljldUtils.hasQuickAddActions 对齐：胃肠组下有此类动作的执行
+ * （如"存药分次鼻饲"的5%葡萄糖）按每次快推时间分行展示。
+ */
+function hasQuickAddActions(execution: DrugExecution): boolean {
+  return (execution.drugActionList ?? []).some(a =>
+    String(a.action ?? '').trim().toLowerCase() === 'quickadd' && parseAmount(a.quickAddAmount) > 0);
+}
+
 /* ---- 数据转换 ---- */
 
 function drugToCell(
@@ -944,11 +954,8 @@ function sumDrugAmountsByChannel(
       const usageAtStart = calcDrugUsageUpTo(execution, effectiveStartMs);
       amount = round1(Math.max(0, usageAtEnd - usageAtStart));
     } else {
-      // 检查是否为有 quickAdd 的 SP/TP/瑞素/瑞高/瑞能 单次给药
-      const drugName = drugDisplayName(execution);
-      const isTargetEnteral = drugName.includes('SP') || drugName.includes('TP')
-        || drugName.includes('瑞素') || drugName.includes('瑞高') || drugName.includes('瑞能');
-      if (isTargetEnteral) {
+      // 行为判定：含带量 quickAdd 的单次给药按分次给药累计（不再限定肠内营养药名）
+      if (hasQuickAddActions(execution)) {
         // 计算在统计区间内的 quickAdd 和 stop 的 quickAddAmount 量
         let quickAddTotal = 0;
         for (const action of (execution.drugActionList ?? [])) {
@@ -1423,27 +1430,35 @@ export function buildRows(
   const nurseInPeriod = source.nurseRecords
     .filter(item => isValidBusinessRecord(item) && hasText(item.desc) && inPeriod(item.time));
 
-  // 收集肠内营养药物的 quickAdd 时间点（仅针对 SP、TP、瑞素、瑞高、瑞能）
+  // 肠内营养跨护理日补充：startTime 不在当前护理日但 quickAdd/带量stop 在当前护理日（与后端对齐）
+  const enteralCrossDayDrugs = source.drugExecutions
+    .filter(item => isRenderableDrugExecution(item) && !inPeriod(item.startTime))
+    .filter(item => {
+      const method = findDrugMethod(item.methodCode, source.drugMethods);
+      return !!method && String(method.group ?? '').trim() === '胃肠' && hasQuickAddActions(item);
+    })
+    .filter(item => (item.drugActionList ?? []).some(a => {
+      const act = String(a.action ?? '').trim().toLowerCase();
+      const isDoseAction = act === 'quickadd' || (act === 'stop' && parseAmount(a.quickAddAmount) > 0);
+      return isDoseAction && inPeriod(a.time);
+    }));
+
+  // 收集肠内分次给药的 quickAdd/带量stop 时间点（行为判定，仅收护理区间内，避免跨日幻影行）
   const enteralQuickAddKeys: number[] = [];
-  for (const execution of source.drugExecutions) {
+  for (const execution of [...drugsInPeriod, ...enteralCrossDayDrugs]) {
     if (!isRenderableDrugExecution(execution)) { continue; }
     const method = findDrugMethod(execution.methodCode, source.drugMethods);
     if (!method) { continue; }
     const isEnteral = String(method.group ?? '').trim() === '胃肠';
     if (!isEnteral) { continue; }
+    // 行为判定：含带量 quickAdd 的胃肠组执行按分次给药收集时间键
+    if (!hasQuickAddActions(execution)) { continue; }
 
-    // 检查药物名称是否包含 SP、TP、瑞素、瑞高、瑞能
-    const drugName = drugDisplayName(execution);
-    const isTargetEnteral = drugName.includes('SP') || drugName.includes('TP')
-      || drugName.includes('瑞素') || drugName.includes('瑞高') || drugName.includes('瑞能');
-    if (!isTargetEnteral) { continue; }
-
-    // 收集 quickAdd 和 stop 动作的时间点（不限制在护理区间内，后续循环中会判断）
     for (const action of (execution.drugActionList ?? [])) {
       const act = String(action.action ?? '').trim().toLowerCase();
-      if (act !== 'quickadd' && act !== 'stop') { continue; }
-      const actionTime = databaseTimeValue(action.time);
-      if (!Number.isFinite(actionTime)) { continue; }
+      const isDoseAction = act === 'quickadd' || (act === 'stop' && parseAmount(action.quickAddAmount) > 0);
+      if (!isDoseAction) { continue; }
+      if (!inPeriod(action.time)) { continue; }
       const actionKey = minuteKey(action.time);
       if (Number.isFinite(actionKey)) {
         enteralQuickAddKeys.push(actionKey);
@@ -1543,16 +1558,14 @@ export function buildRows(
     const medications: NameAmountRoute[] = [];
     const enteral: NameAmountRoute[] = [];
 
-    // 肠内营养 quickAdd：遍历所有区间内药物，不按 startTime 过滤
-    for (const execution of drugsInPeriod) {
+    // 肠内营养 quickAdd：遍历区间内药物和跨日药物，不按 startTime 过滤（行为判定，替代药名白名单）
+    for (const execution of [...drugsInPeriod, ...enteralCrossDayDrugs]) {
       const method = findDrugMethod(execution.methodCode, source.drugMethods);
       if (!method) { continue; }
       const isEnteral = String(method.group ?? '').trim() === '胃肠';
       if (!isEnteral) { continue; }
       const drugName = drugDisplayName(execution);
-      const isTargetEnteral = drugName.includes('SP') || drugName.includes('TP')
-        || drugName.includes('瑞素') || drugName.includes('瑞高') || drugName.includes('瑞能');
-      if (!isTargetEnteral) { continue; }
+      if (!hasQuickAddActions(execution)) { continue; }
 
       for (const action of (execution.drugActionList ?? [])) {
         if (String(action.action ?? '').trim().toLowerCase() !== 'quickadd') { continue; }
@@ -1614,9 +1627,8 @@ export function buildRows(
       const method = findDrugMethod(execution.methodCode, source.drugMethods);
       if (!method) { return; }
       const isEnteral = String(method.group ?? '').trim() === '胃肠';
-      const drugName = drugDisplayName(execution);
-      const isTargetEnteral = isEnteral && (drugName.includes('SP') || drugName.includes('TP')
-          || drugName.includes('瑞素') || drugName.includes('瑞高') || drugName.includes('瑞能'));
+      // 行为判定替代药名白名单：胃肠组且含带量 quickAdd 的执行按分次给药处理
+      const isTargetEnteral = isEnteral && hasQuickAddActions(execution);
 
       // 检查当前时间点是否有 quickAdd（用于跳过总量行）
       let hasQuickAddAtTime = false;
@@ -1669,14 +1681,13 @@ export function buildRows(
 
     });
 
-    // 单次给药 stop 时间点：仅瑞素/瑞高/短肽/瑞能，累积 quickAdd 量 + stop 的 quickAddAmount == liquidAmount 时才展示
-    for (const execution of drugsInPeriod) {
+    // 单次给药 stop 时间点：累积 quickAdd 量 + stop 的 quickAddAmount == liquidAmount 时才展示
+    // （行为判定含跨日药物：stop 携带末次给药量，跨日不可丢）
+    for (const execution of [...drugsInPeriod, ...enteralCrossDayDrugs]) {
       const method = findDrugMethod(execution.methodCode, source.drugMethods);
       if (!method) { continue; }
       const isEnteral = String(method.group ?? '').trim() === '胃肠';
-      const drugName = drugDisplayName(execution);
-      const isTargetEnteral = isEnteral && (drugName.includes('SP') || drugName.includes('TP')
-          || drugName.includes('瑞素') || drugName.includes('瑞高') || drugName.includes('瑞能'));
+      const isTargetEnteral = isEnteral && hasQuickAddActions(execution);
       if (!isTargetEnteral) { continue; }
 
       const stopAction = (execution.drugActionList ?? []).find(a =>

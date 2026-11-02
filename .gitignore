@@ -68,3 +68,4 @@ application-*.yml
 .workbuddy/
 build.bat
 build(1).bat
+.tmp-dl/

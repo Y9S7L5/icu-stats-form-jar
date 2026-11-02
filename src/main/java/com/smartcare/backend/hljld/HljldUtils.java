@@ -1603,6 +1603,21 @@ public final class HljldUtils {
     }
 
     /**
+     * 判断执行记录是否含带量的 quickAdd 动作（分次给药行为判定，替代药名白名单）。
+     * 胃肠组下有此类动作的执行（如"存药分次鼻饲"的5%葡萄糖）应按每次快推时间分行展示。
+     */
+    public static boolean hasQuickAddActions(Document execution) {
+        if (execution == null) return false;
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> actions = (List<Map<String, Object>>) execution.get("drugActionList");
+        if (actions == null) return false;
+        return actions.stream().anyMatch(a -> {
+            String act = strOrNull(a, "action");
+            return act != null && "quickadd".equalsIgnoreCase(act.trim()) && parseAmount(a.get("quickAddAmount")) > 0;
+        });
+    }
+
+    /**
      * 判断编码是否属于检查/治疗/基础护理/健康教育。
      */
     public static boolean isExaminationTreatmentBasicCareOrHealthEducation(String code) {

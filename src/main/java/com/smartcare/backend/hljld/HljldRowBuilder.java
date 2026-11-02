@@ -72,8 +72,8 @@ public class HljldRowBuilder {
             .filter(item -> {
                 Document method = HljldUtils.findDrugMethod(str(item, "methodCode"), source.getDrugMethods());
                 if (method == null || !"胃肠".equals(str(method, "group"))) return false;
-                String drugName = HljldUtils.drugDisplayName(item);
-                return HljldUtils.isTargetEnteral(drugName);
+                // 行为判定：含带量 quickAdd 即按分次展示，不再限定肠内营养药名
+                return HljldUtils.hasQuickAddActions(item);
             })
             .filter(item -> {
                 @SuppressWarnings("unchecked")
@@ -81,7 +81,10 @@ public class HljldRowBuilder {
                 if (actionList == null) return false;
                 return actionList.stream().anyMatch(a -> {
                     String act = str(a, "action").trim().toLowerCase();
-                    return "quickadd".equals(act) && HljldUtils.inNursingRange(str(a, "time"), start, end, startExclusive);
+                    // quickAdd 或带量 stop 落在当前护理日即纳入（stop 携带末次给药量，跨日不可丢）
+                    boolean isDoseAction = "quickadd".equals(act)
+                        || ("stop".equals(act) && HljldUtils.parseAmount(a.get("quickAddAmount")) > 0);
+                    return isDoseAction && HljldUtils.inNursingRange(str(a, "time"), start, end, startExclusive);
                 });
             })
             .collect(Collectors.toList());
@@ -97,6 +100,13 @@ public class HljldRowBuilder {
             long k = HljldUtils.minuteKey(startTimeStr);
             log.info("[hljld] 药物时间Key: drugName={}, startTime(str)={}, minuteKey={}, id={}", HljldUtils.drugDisplayName(d), startTimeStr, k, d.get("_id"));
             if (k != Long.MIN_VALUE) uniqueKeys.add(k);
+        }
+        // 分次给药（快推/带量stop）的分钟键：无护理记录同分钟时行也要渲染
+        for (Document d : drugsInPeriod) {
+            collectDoseActionKeys(uniqueKeys, d, start, end, startExclusive);
+        }
+        for (Document d : enteralCrossDayDrugs) {
+            collectDoseActionKeys(uniqueKeys, d, start, end, startExclusive);
         }
         for (Document r : nurseInPeriod) {
             long k = HljldUtils.minuteKey(str(r, "time"));
@@ -150,8 +160,8 @@ public class HljldRowBuilder {
                 processDrugExecution(medications, enteral, execution, source, key, timeMs, segments);
             }
 
-            // 单次给药 stop 时间点（肠内营养）
-            processEnteralStop(medications, enteral, drugsInPeriod, source, key);
+            // 单次给药 stop 时间点（肠内营养；含跨日药物——次日stop的末次给药量不可丢）
+            processEnteralStop(medications, enteral, drugsInPeriod, enteralCrossDayDrugs, source, key);
 
             // 床旁数据：带入药量 → medications
             bedsideAtKey.stream()
@@ -820,7 +830,7 @@ public class HljldRowBuilder {
             if (!"胃肠".equals(str(method, "group"))) continue;
 
             String drugName = HljldUtils.drugDisplayName(execution);
-            if (!HljldUtils.isTargetEnteral(drugName)) continue;
+            if (!HljldUtils.hasQuickAddActions(execution)) continue;
 
             List<Map<String, Object>> actionList = getList(execution, "drugActionList");
             if (actionList == null) continue;
@@ -861,7 +871,8 @@ public class HljldRowBuilder {
             }
         }
 
-        boolean isTargetEnteral = isEnteral && HljldUtils.isTargetEnteral(drugName);
+        // 行为判定替代药名白名单：胃肠组且含带量 quickAdd 的执行按分次给药处理
+        boolean isTargetEnteral = isEnteral && HljldUtils.hasQuickAddActions(execution);
 
         // 检查当前时间点是否有 quickAdd
         boolean hasQuickAddAtTime = false;
@@ -961,47 +972,76 @@ public class HljldRowBuilder {
     }
 
     private void processEnteralStop(List<NameAmountRoute> medications, List<NameAmountRoute> enteral,
-                                     List<Document> drugsInPeriod, HljldSourceData source, long key) {
+                                     List<Document> drugsInPeriod, List<Document> crossDayDrugs,
+                                     HljldSourceData source, long key) {
+        // 跨日药物 startTime 不在本护理日，但 stop 可能落在本护理日
+        for (Document execution : crossDayDrugs) {
+            processEnteralStopForExecution(medications, enteral, execution, source, key);
+        }
         for (Document execution : drugsInPeriod) {
-            Document method = HljldUtils.findDrugMethod(str(execution, "methodCode"), source.getDrugMethods());
-            if (method == null) continue;
-            if (!"胃肠".equals(str(method, "group"))) continue;
-            String drugName = HljldUtils.drugDisplayName(execution);
-            if (!HljldUtils.isTargetEnteral(drugName)) continue;
+            processEnteralStopForExecution(medications, enteral, execution, source, key);
+        }
+    }
 
-            List<Map<String, Object>> actionList = getList(execution, "drugActionList");
-            if (actionList == null) continue;
+    private void processEnteralStopForExecution(List<NameAmountRoute> medications, List<NameAmountRoute> enteral,
+                                                Document execution, HljldSourceData source, long key) {
+        Document method = HljldUtils.findDrugMethod(str(execution, "methodCode"), source.getDrugMethods());
+        if (method == null) return;
+        if (!"胃肠".equals(str(method, "group"))) return;
+        if (!HljldUtils.hasQuickAddActions(execution)) return;
 
-            for (Map<String, Object> stopAction : actionList) {
-                String act = str(stopAction, "action").trim().toLowerCase();
-                if (!"stop".equals(act)) continue;
-                if (HljldUtils.minuteKey(str(stopAction, "time")) != key) continue;
+        List<Map<String, Object>> actionList = getList(execution, "drugActionList");
+        if (actionList == null) return;
 
-                long execStartMs = (long) HljldUtils.databaseTimeValue(str(execution, "startTime"));
-                long stopMs = (long) HljldUtils.databaseTimeValue(str(stopAction, "time"));
-                if (execStartMs == Long.MIN_VALUE || stopMs == Long.MIN_VALUE) continue;
+        for (Map<String, Object> stopAction : actionList) {
+            String act = str(stopAction, "action").trim().toLowerCase();
+            if (!"stop".equals(act)) continue;
+            if (HljldUtils.minuteKey(str(stopAction, "time")) != key) continue;
 
-                // 累积 stop 之前的所有 quickAdd 量
-                double cumulativeQuickAdd = 0;
-                for (Map<String, Object> a : actionList) {
-                    String aAct = str(a, "action").trim().toLowerCase();
-                    if (!"quickadd".equals(aAct)) continue;
-                    long aMs = (long) HljldUtils.databaseTimeValue(str(a, "time"));
-                    if (aMs >= execStartMs && aMs <= stopMs) {
-                        cumulativeQuickAdd += HljldUtils.parseAmount(a.get("quickAddAmount"));
-                    }
-                }
-                cumulativeQuickAdd += HljldUtils.parseAmount(stopAction.get("quickAddAmount"));
-                double liquidCap = HljldUtils.resolveLiquidCap(execution);
+            long execStartMs = (long) HljldUtils.databaseTimeValue(str(execution, "startTime"));
+            long stopMs = (long) HljldUtils.databaseTimeValue(str(stopAction, "time"));
+            if (execStartMs == Long.MIN_VALUE || stopMs == Long.MIN_VALUE) continue;
 
-                if (Math.abs(cumulativeQuickAdd - liquidCap) < 0.05) {
-                    NameAmountRoute cell = HljldUtils.drugToCell(execution, method, true, stopMs);
-                    double stopAmount = HljldUtils.parseAmount(stopAction.get("quickAddAmount"));
-                    cell.setAmount(stopAmount > 0 ? String.format("%.0f", stopAmount) : "");
-                    cell.setNumericAmount(stopAmount);
-                    if (cell.hasNameOrAmount()) enteral.add(cell);
+            // 累积 stop 之前的所有 quickAdd 量
+            double cumulativeQuickAdd = 0;
+            for (Map<String, Object> a : actionList) {
+                String aAct = str(a, "action").trim().toLowerCase();
+                if (!"quickadd".equals(aAct)) continue;
+                long aMs = (long) HljldUtils.databaseTimeValue(str(a, "time"));
+                if (aMs >= execStartMs && aMs <= stopMs) {
+                    cumulativeQuickAdd += HljldUtils.parseAmount(a.get("quickAddAmount"));
                 }
             }
+            cumulativeQuickAdd += HljldUtils.parseAmount(stopAction.get("quickAddAmount"));
+            double liquidCap = HljldUtils.resolveLiquidCap(execution);
+
+            if (Math.abs(cumulativeQuickAdd - liquidCap) < 0.05) {
+                NameAmountRoute cell = HljldUtils.drugToCell(execution, method, true, stopMs);
+                double stopAmount = HljldUtils.parseAmount(stopAction.get("quickAddAmount"));
+                cell.setAmount(stopAmount > 0 ? String.format("%.0f", stopAmount) : "");
+                cell.setNumericAmount(stopAmount);
+                if (cell.hasNameOrAmount()) enteral.add(cell);
+            }
+        }
+    }
+
+    /**
+     * 收集执行记录中带量给药动作（quickAdd/stop）的分钟键。
+     * 分次给药的行按动作时间渲染，动作分钟若无护理/床旁记录同分钟，行会整体缺失——故将其纳入 uniqueKeys。
+     * 仅收当前护理日区间内的动作，避免区间外动作（如次日 stop）在本页产生幻影行。
+     */
+    private void collectDoseActionKeys(Set<Long> uniqueKeys, Document execution,
+                                       Date start, Date end, boolean startExclusive) {
+        List<Map<String, Object>> actionList = getList(execution, "drugActionList");
+        if (actionList == null) return;
+        for (Map<String, Object> a : actionList) {
+            String act = str(a, "action").trim().toLowerCase();
+            boolean isDoseAction = "quickadd".equals(act)
+                || ("stop".equals(act) && HljldUtils.parseAmount(a.get("quickAddAmount")) > 0);
+            if (!isDoseAction) continue;
+            if (!HljldUtils.inNursingRange(str(a, "time"), start, end, startExclusive)) continue;
+            long k = HljldUtils.minuteKey(str(a, "time"));
+            if (k != Long.MIN_VALUE) uniqueKeys.add(k);
         }
     }
 

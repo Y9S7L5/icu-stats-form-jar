@@ -2,6 +2,7 @@
   <div class="toolbar-left">
     <label class="ps">医嘱时间：<select [ngModel]="selectedRecordId" (ngModelChange)="onTimeChange($event)" [disabled]="loading || switchingRecord || creating || printingAll"><option value="">{{ timeOptions.length ? '请选择' : '暂无' }}</option><option *ngFor="let o of timeOptions" [value]="o.id">{{ orderTimeOptionLabel(o) }}</option></select></label>
     <button type="button" class="btn primary" [disabled]="loading || switchingRecord || creating || printingAll || !pid" (click)="openCreateDialog()">新增</button>
+    <button type="button" class="btn danger" [disabled]="loading || switchingRecord || creating || deleting || printingAll || !selectedRecordId" (click)="deleteCurrentRecord()">{{ deleting ? '删除中…' : '删除' }}</button>
   </div>
   <div class="toolbar-right">
     <span class="as"><ng-container [ngSwitch]="autoSaveState"><span *ngSwitchCase="'dirty'">未保存</span><span *ngSwitchCase="'saving'">保存中…</span><span *ngSwitchCase="'saved'" class="ok">已自动保存</span><button *ngSwitchCase="'error'" class="retry" (click)="retryAutoSave()">自动保存失败，重试</button></ng-container></span>
@@ -240,7 +241,7 @@
           <td class="field-label-cell"></td>
           <td class="value-cell"></td>
           <td class="field-label-cell">超滤率（ml/h）</td>
-          <td class="value-cell formula-value-cell"><input class="screen-only formula-input" type="number" [(ngModel)]="order.treatmentPlan.ultrafiltrationRate" [disabled]="!canEditDoctorField()" (ngModelChange)="onPageChanged()" /><span class="print-only print-value">{{ order.treatmentPlan.ultrafiltrationRate ?? '' }}</span></td>
+          <td class="value-cell formula-value-cell"><input class="screen-only formula-input" type="text" [(ngModel)]="order.treatmentPlan.ultrafiltrationRate" [disabled]="!canEditDoctorField()" (ngModelChange)="onPageChanged()" /><span class="print-only print-value">{{ order.treatmentPlan.ultrafiltrationRate ?? '' }}</span></td>
         </tr>
       </tbody>
     </table>

@@ -8,7 +8,7 @@
  *  - R4C1 饮食   bedside param_biSiLiquid 最新一条   R4C2 防误吸 bedside param_score_mechanicalAspirationRisk 最新一条
  *  - R5C1 VTE    clinicalDiagnosis 含"深静脉血栓"    R5C2 防意外拔管 bedside param_score_unPlannedCGZYY 最新一条
  *  - R6C1 解除隔离 DataCenter VI_ICU_ZYYZ 医嘱        R6C2 空白
- * 风险等级配色：高/极高风险红底白字、中风险黄底白字、低风险绿底白字、未评估灰底白字。
+ * 风险等级配色：高/极高风险（含高险/高危/高度危险）红底白字、中风险黄底白字、低风险（含低险/低危）绿底白字、未评估灰底白字。
  * 打印：前端浏览器打印，A4 纵向，卡片为半张 A4（210mm × 148.5mm），占上半页。
  */
 import { HttpClient } from '@angular/common/http';
@@ -318,34 +318,42 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
     this.cells = cells;
   }
 
-  /** 按 code 取最新一条有效记录的 strVal */
+  /**
+   * 按 code 取最新一条有效记录的 strVal，返回 Map<key, strVal>。
+   * 注意：键是 BEDSIDE_PARAMS 的短名 key（如 'diet'），供 buildCells 按 key 查找；
+   * 记录里的 code（如 'param_biSiLiquid'）需经 code→key 映射，否则查找会落空。
+   */
   private latestValues(records: BedsideRecord[]): Map<string, string> {
+    const keyOf = new Map<string, string>();
+    for (const p of BEDSIDE_PARAMS) keyOf.set(p.code, p.key);
     const latest = new Map<string, { time: number; val: string }>();
     for (const rec of records) {
       if (!rec) continue;
       if (rec.valid === false || String(rec.valid) === 'false') continue;
-      const code = String(rec.code ?? '');
-      if (!code) continue;
+      const key = keyOf.get(String(rec.code ?? ''));
+      if (!key) continue;
       const time = parseTimeMs(rec.time);
-      const prev = latest.get(code);
+      const prev = latest.get(key);
       if (!prev || time >= prev.time) {
-        latest.set(code, { time, val: String(rec.strVal ?? '').trim() });
+        latest.set(key, { time, val: String(rec.strVal ?? '').trim() });
       }
     }
     const result = new Map<string, string>();
-    latest.forEach((v, code) => result.set(code, v.val));
+    latest.forEach((v, key) => result.set(key, v.val));
     return result;
   }
 
   /**
-   * 风险等级映射：高/极高风险（含"高险"简写）→ 红；中风险 → 黄；低风险 → 绿；未评估 → 灰。
+   * 风险等级映射（子串包含匹配）：高/极高风险、高险、高危、高度危险 → 红；
+   * 中风险、中险、中危、中度危险 → 黄；低风险、低险、低危、低度危险 → 绿；未评估/其他 → 灰。
+   * 库里实际存值示例："11(高度危险)"、"11(高危)"、"16(低危)"、"低风险"。
    */
   private riskLevelOf(val: string): CellLevel {
     const v = val.trim();
     if (!v) return 'gray';
-    if (v.includes('高风险') || v.includes('高险')) return 'red';
-    if (v.includes('中风险') || v.includes('中险')) return 'yellow';
-    if (v.includes('低风险') || v.includes('低险')) return 'green';
+    if (v.includes('高风险') || v.includes('高险') || v.includes('高危') || v.includes('高度危险')) return 'red';
+    if (v.includes('中风险') || v.includes('中险') || v.includes('中危') || v.includes('中度危险')) return 'yellow';
+    if (v.includes('低风险') || v.includes('低险') || v.includes('低危') || v.includes('低度危险')) return 'green';
     return 'gray';
   }
 

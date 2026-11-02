@@ -32,7 +32,7 @@ interface CrrtOrderFormRecord {
   cbpDose: { preReplacement: number|null; postReplacement: number|null; dialysate: number|null; sodiumBicarbonate: number|null; plasmaSeparationSpeed: number|null; plasmaDiscardSpeed: number|null; plasmaReplacementSpeed: number|null; totalPlasmaExchange: number|null; };
   replacementFormulaA: { baseSolution: number|null; potassiumChloride: number|null; sodiumChloride: number|null; };
   dialysateFormulaA: { baseSolution: number|null; potassiumChloride: number|null; sodiumChloride: number|null; };
-  treatmentPlan: { bloodFlow: number|null; estimatedHours: number|null; ultrafiltrationRate: number|null; };
+  treatmentPlan: { bloodFlow: number|null; estimatedHours: number|null; ultrafiltrationRate: number|string|null; };
   doctorSignature: SignatureValue|null; machineNurseSignature: SignatureValue|null; checkNurseSignature: SignatureValue|null;
   replacementPrescriptions: PrescriptionColumn[]; dialysatePrescriptions: PrescriptionColumn[]; orderItems: OrderItem[];
   createdAt?: string; updatedAt?: string;
@@ -60,7 +60,7 @@ export class CrrtOrderFormComponent implements OnInit, OnDestroy {
   nurseAccounts: AccountOption[] = [];
   loading = false; isDraft = false; hasRecords = false;
   message = ''; errorMessage = '';
-  switchingRecord = false; creating = false;
+  switchingRecord = false; creating = false; deleting = false;
 
   /* 新增弹框 */
   createDialogOpen = false;
@@ -334,6 +334,51 @@ export class CrrtOrderFormComponent implements OnInit, OnDestroy {
         },
         error: e => { this.ngZone.run(() => { this.createDialogError = e?.error?.message || `创建失败${e?.status ? `（${e.status}）` : ''}`; this.cdr.detectChanges(); }); },
       });
+  }
+
+  /* 删除当前医嘱单 */
+  deleteCurrentRecord(): void {
+    const id = this.record?.id || this.selectedRecordId;
+    if (!id || this.deleting || this.creating || this.switchingRecord) return;
+    const timeText = this.displayTime(this.record?.orderTime);
+    if (!confirm(`确认删除${timeText ? ` ${timeText} 的` : ''}CRRT 医嘱单？删除后不可恢复。`)) return;
+    const operatorId = this.currentAccountId();
+    const operationPid = this.pid;
+    this.deleting = true;
+    this.waitForSaveSettled(() => {
+      this.http.delete(`${this.apiUrl}/${encodeURIComponent(id)}`, { params: { operatorId } })
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: () => {
+            this.ngZone.run(() => {
+              this.deleting = false;
+              if (operationPid === this.pid) {
+                this.autoSaveState = 'idle'; this.localRevision = 0; this.savedRevision = 0;
+                this.loadTimeOptions();
+              }
+              this.cdr.detectChanges();
+            });
+          },
+          error: e => {
+            this.ngZone.run(() => {
+              this.deleting = false;
+              alert(e?.error?.message || '删除失败，请稍后重试');
+              this.cdr.detectChanges();
+            });
+          },
+        });
+    });
+  }
+
+  /* 等待在途自动保存结束（期间取消后续保存，删除后不再写回） */
+  private waitForSaveSettled(cb: () => void): void {
+    const tick = () => {
+      if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+      this.saveAgainAfterCurrent = false;
+      if (this.saveInFlight) { setTimeout(tick, 100); return; }
+      cb();
+    };
+    tick();
   }
 
   private upsertTimeOption(record: CrrtOrderFormRecord): void {

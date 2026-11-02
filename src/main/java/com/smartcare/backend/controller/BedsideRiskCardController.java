@@ -157,9 +157,14 @@ public class BedsideRiskCardController {
             try {
                 return toDate(Long.parseLong(s));
             } catch (NumberFormatException ignored) {}
-            try {
-                return new Date(java.text.Date.parse(s));
-            } catch (Exception ignored) { return null; }
+            for (String pattern : new String[]{"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm"}) {
+                try {
+                    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat(pattern);
+                    fmt.setLenient(false);
+                    return fmt.parse(s);
+                } catch (Exception ignored) {}
+            }
+            return null;
         }
         return null;
     }

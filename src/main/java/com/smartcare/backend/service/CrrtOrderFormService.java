@@ -30,6 +30,8 @@ public class CrrtOrderFormService {
         return repo.save(record);
     }
 
+    public void delete(String id) { repo.deleteById(id); }
+
     public static class DuplicateCrrtOrderTimeException extends RuntimeException {
         public DuplicateCrrtOrderTimeException() { super("该医嘱时间已经存在，请选择其他时间。"); }
     }

@@ -45,6 +45,15 @@ public class CrrtOrderFormController {
         }
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable String id, @RequestParam(defaultValue = "") String operatorId) {
+        if (service.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        service.delete(id);
+        return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<?> update(@PathVariable String id, @RequestBody CrrtOrderFormRecord body, @RequestParam(defaultValue = "") String operatorId) {
         try {

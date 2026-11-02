@@ -148,7 +148,21 @@ public class HljldSummaryCalculator {
             })
             .filter(item -> {
                 Document method = HljldUtils.findDrugMethod(str(item, "methodCode"), source.getDrugMethods());
-                return method != null && Boolean.FALSE.equals(method.get("isOnce")); // 仅持续泵注
+                if (method == null) return false;
+                Boolean isOnceObj = method.getBoolean("isOnce");
+                boolean once = isOnceObj == null || isOnceObj;
+                if (!once) return true; // 持续泵注：延续原续用逻辑
+                // 单次给药：仅当含带量分次动作且落在本护理日时纳入（如存药分次鼻饲的跨日 quickAdd/stop）
+                if (!HljldUtils.hasQuickAddActions(item)) return false;
+                List<Map<String, Object>> actionList = getList(item, "drugActionList");
+                if (actionList == null) return false;
+                return actionList.stream().anyMatch(a -> {
+                    String act = str(a, "action").trim().toLowerCase();
+                    boolean isDoseAction = "quickadd".equals(act)
+                        || ("stop".equals(act) && HljldUtils.parseAmount(a.get("quickAddAmount")) > 0);
+                    long actionTime = (long) HljldUtils.databaseTimeValue(str(a, "time"));
+                    return isDoseAction && actionTime >= startMs && actionTime < effectiveEndMs;
+                });
             })
             .filter(item -> {
                 // endTime 在统计开始时间之后（或未结束），只要与统计区间有重叠即可
@@ -211,18 +225,22 @@ public class HljldSummaryCalculator {
 
             double amt = 0;
             if (once) {
-                // 单次给药：优先取 quickadd，否则用 liquidAmount
-                double totalQuickAdd = 0;
+                // 单次给药：统计落在本护理日内的 quickAdd 与带量 stop（与前端/跨日续计口径一致，避免跨日动作重复计入）
+                double totalDose = 0;
                 if (actionList != null) {
                     for (Map<String, Object> action : actionList) {
                         String act = str(action, "action").trim().toLowerCase();
-                        if ("quickadd".equals(act)) {
-                            totalQuickAdd += HljldUtils.parseAmount(action.get("quickAddAmount"));
+                        boolean isDoseAction = "quickadd".equals(act)
+                            || ("stop".equals(act) && HljldUtils.parseAmount(action.get("quickAddAmount")) > 0);
+                        if (!isDoseAction) continue;
+                        long actionTime = (long) HljldUtils.databaseTimeValue(str(action, "time"));
+                        if (actionTime >= startMs && actionTime < effectiveEndMs) {
+                            totalDose += HljldUtils.parseAmount(action.get("quickAddAmount"));
                         }
                     }
                 }
-                if (totalQuickAdd > 0) {
-                    amt = totalQuickAdd;
+                if (totalDose > 0) {
+                    amt = totalDose;
                 } else {
                     amt = HljldUtils.parseAmount(execution.get("liquidAmount"));
                     if (amt <= 0) {
@@ -259,23 +277,20 @@ public class HljldSummaryCalculator {
 
             double amt = 0;
             if (once) {
-                // 单次给药：优先取当前护理日内的 quickAdd 量
+                // 单次给药跨日续计：统计本护理日内的 quickAdd 与带量 stop。
+                // 全量已在起始护理日计入，此分支不可再回退 liquidAmount（否则跨日药会被重复计全量）。
                 List<Map<String, Object>> actionList = getList(execution, "drugActionList");
                 if (actionList != null) {
                     for (Map<String, Object> action : actionList) {
                         String act = str(action, "action").trim().toLowerCase();
-                        if ("quickadd".equals(act)) {
-                            long actionTime = (long) HljldUtils.databaseTimeValue(str(action, "time"));
-                            if (actionTime >= startMs && actionTime < effectiveEndMs) {
-                                amt += HljldUtils.parseAmount(action.get("quickAddAmount"));
-                            }
+                        boolean isDoseAction = "quickadd".equals(act)
+                            || ("stop".equals(act) && HljldUtils.parseAmount(action.get("quickAddAmount")) > 0);
+                        if (!isDoseAction) continue;
+                        long actionTime = (long) HljldUtils.databaseTimeValue(str(action, "time"));
+                        if (actionTime >= startMs && actionTime < effectiveEndMs) {
+                            amt += HljldUtils.parseAmount(action.get("quickAddAmount"));
                         }
                     }
-                }
-                // 无 quickAdd 则用 liquidAmount
-                if (amt <= 0) {
-                    amt = HljldUtils.parseAmount(execution.get("liquidAmount"));
-                    if (amt <= 0) amt = HljldUtils.parseAmount(execution.get("dose"));
                 }
             } else {
                 // 持续泵注：使用差值法计算实际用量（与ivgtt药物一致）
