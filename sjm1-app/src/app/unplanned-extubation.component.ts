@@ -459,7 +459,7 @@ type ScoreField = 'ssd' | 'gthz' | 'xwhz' | 'dgsl' | 'dggd';
       height: 210mm;
       min-height: 210mm;
       margin: 16px auto;
-      padding: 6mm 7mm 15mm;
+      padding: 7mm 10mm;
       overflow: hidden;
       background: #fff;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -1045,7 +1045,7 @@ export class UnplannedExtubationComponent implements OnInit, AfterViewInit, OnDe
         min-height: 210mm !important;
         max-height: 210mm !important;
         margin: 0 !important;
-        padding: 6mm 7mm 15mm !important;
+        padding: 7mm 10mm !important;
         overflow: hidden !important;
         background: #fff;
         box-shadow: none !important;

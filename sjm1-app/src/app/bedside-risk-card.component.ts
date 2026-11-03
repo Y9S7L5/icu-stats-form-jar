@@ -97,7 +97,7 @@ function parseTimeMs(str: string | undefined): number {
           <table class="risk-table" [style.font-size]="labelFontPt + 'pt'">
             <tbody>
               <tr class="title-row">
-                <td colspan="2" class="title-cell">护理级别及风险防范</td>
+                <td colspan="2" class="title-cell">护理级别及风险防范卡</td>
               </tr>
               <tr class="info-row">
                 <td><span class="label">姓名：{{ patientName || '—' }}</span></td>

@@ -355,7 +355,7 @@ export class HealthEducationComponent implements OnInit, OnDestroy {
       @page{size:A4 portrait;margin:0}html,body{margin:0;padding:0;background:#fff}
       .print-page{box-sizing:border-box;width:210mm;height:297mm;overflow:hidden;page-break-after:always;break-after:page;background:#fff}
       .print-page:last-child{page-break-after:auto;break-after:auto}
-      .sheet{box-sizing:border-box;position:relative;width:210mm;min-height:297mm;margin:0;padding:8mm 8mm 14mm;box-shadow:none;background:#fff;color:#000;overflow:hidden}
+      .sheet{box-sizing:border-box;position:relative;width:210mm;min-height:297mm;margin:0;padding:7mm 10mm;box-shadow:none;background:#fff;color:#000;overflow:hidden}
       h1{margin:0 0 4px;text-align:center;font-family:SimHei,sans-serif;font-size:18pt}
       .patient-line{display:flex;justify-content:space-between;margin:2px 0 4px;font-family:'SimSun','宋体',serif;font-size:11pt;font-weight:400;color:#000}
       .patient-line strong{font-weight:700}

@@ -7,7 +7,7 @@
 .btn:disabled{cursor:not-allowed;opacity:.55}
 .loading{padding:16px;font-family:'SimSun','宋体',serif}
 .loading.error{color:#b42318}
-.sheet{box-sizing:border-box;position:relative;width:210mm;min-height:297mm;margin:16px auto;padding:8mm 8mm 14mm;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);color:#000}
+.sheet{box-sizing:border-box;position:relative;width:210mm;min-height:297mm;margin:16px auto;padding:7mm 10mm;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);color:#000}
 h1{margin:0 0 4px;text-align:center;font-family:SimHei,sans-serif;font-size:18pt;font-weight:700}
 .patient-info{width:100%;font-family:'SimSun','宋体',serif;font-size:13pt;font-weight:400;color:#000;margin:2px 0 4px}
 .patient-info-row{display:flex;align-items:center;width:100%;gap:18px;white-space:nowrap;margin:2px 0}
@@ -278,4 +278,4 @@ em{color:#dc2626;font-style:normal}
 .inline-other-input{width:220px;min-height:30px;padding:4px 7px}
 @media(max-width:900px){.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.option-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.basic-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.form-grid,.option-grid{grid-template-columns:1fr}.option-wide{grid-column:span 1}.overlay{padding:10px}.basic-form-grid{grid-template-columns:1fr}}
-@media print{@page{size:A4 portrait;margin:0}:host{background:#fff}.no-print,.shared-screen-editor,.shared-actions{display:none!important}.sheet{width:210mm;height:297mm;margin:0;padding:8mm 8mm 14mm;box-shadow:none;overflow:hidden;page-break-after:always}.sheet:last-of-type{page-break-after:auto}h1{font-size:16pt}.paper-table{font-size:9pt}.paper-table th,.paper-table td{padding:2px 3px}.paper-table col.category-column{width:20px}.paper-table col.record-column{width:46px}.paper-table .group{width:20px;min-width:20px;max-width:20px}}
+@media print{@page{size:A4 portrait;margin:0}:host{background:#fff}.no-print,.shared-screen-editor,.shared-actions{display:none!important}.sheet{width:210mm;height:297mm;margin:0;padding:7mm 10mm;box-shadow:none;overflow:hidden;page-break-after:always}.sheet:last-of-type{page-break-after:auto}h1{font-size:16pt}.paper-table{font-size:9pt}.paper-table th,.paper-table td{padding:2px 3px}.paper-table col.category-column{width:20px}.paper-table col.record-column{width:46px}.paper-table .group{width:20px;min-width:20px;max-width:20px}}

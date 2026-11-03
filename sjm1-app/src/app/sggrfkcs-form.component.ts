@@ -367,7 +367,7 @@ export class SggrfkcsFormComponent implements OnInit, OnDestroy {
     const css = `
       @page{size:A4 landscape;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#000}
       .print-page{width:297mm;height:210mm;overflow:hidden;break-after:page;page-break-after:always}.print-page:last-child{break-after:auto;page-break-after:auto}
-      .sheet{position:relative;width:297mm;height:210mm;margin:0;padding:5mm 6mm 8mm;overflow:hidden;background:#fff;box-shadow:none}
+      .sheet{position:relative;width:297mm;height:210mm;margin:0;padding:7mm 10mm;overflow:hidden;background:#fff;box-shadow:none}
       h1{margin:0 0 2mm;text-align:center;font-family:SimHei,'Microsoft YaHei',sans-serif;font-size:18pt;line-height:1.15}
       .patient-info{display:grid;grid-template-columns:1.1fr .9fr .8fr 1fr .65fr .65fr 2.5fr;gap:2mm;margin-bottom:2mm;font-family:'SimSun','宋体',serif;font-size:10pt;line-height:1.2;white-space:nowrap}.patient-info span{min-width:0;overflow:hidden;text-overflow:ellipsis}
       .control-table{width:100%;border-collapse:collapse;table-layout:fixed;font-family:'SimSun','宋体',serif;font-size:8.5pt;line-height:1.18}.control-table col.col-date{width:7.3%}.control-table col.col-measure{width:3.47%}.control-table col.col-signature{width:4.3%}
