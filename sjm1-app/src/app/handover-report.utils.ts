@@ -16,10 +16,11 @@ import { firstDiagnosisSegment, resolveNursingDayDiagnosis } from './diagnosis-h
 
 const SHIFT_KEYS: ShiftKey[] = ['day', 'evening', 'night'];
 
+// 展示顺序：死亡 → 出院/转出 → 新收(入院) → 转入 → 手术 → 危重(病危)
 const STATUS_ORDER: Record<HandoverStatus, number> = {
-  '出院': 1, '转出': 2, '死亡': 3, '转入': 4, '入院': 5, '病危': 6, '手术': 7,
+  '死亡': 1, '出院': 2, '转出': 3, '入院': 4, '转入': 5, '手术': 6, '病危': 7,
   // 转入/入院与当日手术合并行：排位跟随转入/入院事件
-  '转入、手术': 4, '入院、手术': 5,
+  '转入、手术': 5, '入院、手术': 4,
 };
 
 export function buildShiftRanges(selectedDate: Date): Record<ShiftKey, ShiftRange> {
@@ -189,11 +190,16 @@ function collectPatientDayEvents(patient: DepartmentPatient, ranges: Record<Shif
     events.in = { status: inStatus, shift: inShift, time: timeValue(patient.icuAdmissionTime) };
   }
 
+  // 同一结束时间的多条手术记录只计一次（展示行与班次统计共用，避免重复成行）
+  const seenOpTimes = new Set<number>();
   for (const op of patient.patientOperations || []) {
     if (op.valid === false || !op.endTime) continue;
     const opShift = resolveShift(op.endTime, ranges);
     if (!opShift) continue;
-    events.ops.push({ shift: opShift, time: timeValue(op.endTime) });
+    const opTime = timeValue(op.endTime);
+    if (seenOpTimes.has(opTime)) continue;
+    seenOpTimes.add(opTime);
+    events.ops.push({ shift: opShift, time: opTime });
   }
 
   return events;
