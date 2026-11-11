@@ -208,11 +208,12 @@ function parseTimeMs(str: string | undefined): number {
       font-size: 16pt; font-weight: 700; color: #000;
       background: #fff;
     }
-    /* 卡片下方右侧日期：进入模块时取当天（yyyy-MM-dd），右对齐卡片右缘；打印时标签换"打印日期：" */
+    /* 卡片下方右侧日期：进入模块时取当天（yyyy-MM-dd），右缘对齐表格右边框（=卡片右padding 5mm，不超出）；打印时标签换"打印日期：" */
     .card-date {
       box-sizing: border-box;
       width: 12cm;
       margin-top: 0;
+      padding-right: 5mm;
       font-size: 14px; color: #000;
       text-align: right;
     }
@@ -276,12 +277,13 @@ function parseTimeMs(str: string | undefined): number {
       :host { display: block; width: auto; margin: 0 !important; padding: 0 !important; overflow: visible; }
       .no-print { display: none !important; }
       .preview { padding: 0 !important; display: block !important; }
-      /* 日期行：卡片下方右对齐；打印标签换"打印日期："；无上边距（间距由卡片下 padding 4mm 承担），下方留多(10mm) */
+      /* 日期行：卡片下方右缘对齐表格右边框（padding-right 同卡片右padding 5mm，不超出）；打印标签换"打印日期："；无上边距（间距由卡片下 padding 4mm 承担），下方留多(10mm) */
       .card-date .lbl-screen { display: none; }
       .card-date .lbl-print { display: inline; }
       .card-date {
         width: 12cm !important;
         margin: 0 auto 10mm !important;
+        padding-right: 5mm !important;
         font-size: 14px; color: #000 !important;
         text-align: right;
       }
