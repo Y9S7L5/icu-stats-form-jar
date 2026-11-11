@@ -3,6 +3,7 @@
  * 访问路径：/form/bedsideRiskCardForm
  * 通过握手机制（HostPatientService）获取当前患者，按 2 列表格动态渲染护理级别及风险防范（固定 6 行 + 自定义行）：
  *  - R1          标题行（合并两列）：护理级别及风险防范
+ *  - 卡片下方右侧 日期：yyyy-MM-dd（进入模块时取当天；打印时标签换"打印日期："）
  *  - R2C1 特级护理（固定红底白字）      R2C2 防跌倒   bedside param_score_patientFallDangerFactorV2 最新一条 strVal
  *  - R3C1 过敏史 dFormData gms1/gms4   R3C2 防压疮   bedside param_yaChuang_score 最新一条 strVal
  *  - R4C1 饮食   bedside param_biSiLiquid 最新一条   R4C2 防误吸 bedside param_score_mechanicalAspirationRisk 最新一条
@@ -69,6 +70,12 @@ interface ExtraInfo {
   contactIsolation?: boolean;
 }
 
+/** 本地日期 → yyyy-MM-dd（进入模块时取一次，界面与打印同步展示） */
+function formatYmd(d: Date): string {
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 /** 解析 bedside.time（字符串时间戳或日期串）为毫秒数 */
 function parseTimeMs(str: string | undefined): number {
   const s = String(str ?? '').trim();
@@ -115,6 +122,11 @@ function parseTimeMs(str: string | undefined): number {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- 卡片下方右侧日期：界面标签"日期："，打印标签"打印日期：" -->
+        <div class="card-date">
+          <span class="lbl-screen">日期：</span><span class="lbl-print">打印日期：</span>{{ cardDate }}
         </div>
 
         <!-- 行编辑器：新增/修改自定义行（no-print，不随打印输出）；纵向排布：标识行 + 第1列 + 第2列 -->
@@ -166,11 +178,11 @@ function parseTimeMs(str: string | undefined): number {
     .wait-hint, .loading { padding: 28px; text-align: center; color: #64748b; font-size: 14px; }
     .preview { padding: 16px 0; display: flex; flex-direction: column; align-items: center; }
 
-    /* 卡片 = 12cm × 9cm；纸张边框不画，只有表格黑框 */
+    /* 卡片 = 12cm × 9cm；纸张边框不画，只有表格黑框；下 padding 4mm（日期行紧贴其后） */
     .card {
       box-sizing: border-box;
       width: 12cm; height: 9cm;
-      padding: 5mm;
+      padding: 5mm 5mm 4mm;
       background: #fff;
       overflow: hidden;
     }
@@ -196,6 +208,15 @@ function parseTimeMs(str: string | undefined): number {
       font-size: 16pt; font-weight: 700; color: #000;
       background: #fff;
     }
+    /* 卡片下方右侧日期：进入模块时取当天（yyyy-MM-dd），右对齐卡片右缘；打印时标签换"打印日期：" */
+    .card-date {
+      box-sizing: border-box;
+      width: 12cm;
+      margin-top: 0;
+      font-size: 14px; color: #000;
+      text-align: right;
+    }
+    .card-date .lbl-print { display: none; }
     .risk-table td .label {
       font-family: 'SimHei', '黑体', sans-serif;
       /* 字号不写死：从表级 [style.font-size] 继承，行数增多时整体缩小保证不超 12cm×9cm */
@@ -255,16 +276,23 @@ function parseTimeMs(str: string | undefined): number {
       :host { display: block; width: auto; margin: 0 !important; padding: 0 !important; overflow: visible; }
       .no-print { display: none !important; }
       .preview { padding: 0 !important; display: block !important; }
+      /* 日期行：卡片下方右对齐；打印标签换"打印日期："；无上边距（间距由卡片下 padding 4mm 承担），下方留多(10mm) */
+      .card-date .lbl-screen { display: none; }
+      .card-date .lbl-print { display: inline; }
+      .card-date {
+        width: 12cm !important;
+        margin: 0 auto 10mm !important;
+        font-size: 14px; color: #000 !important;
+        text-align: right;
+      }
       .card {
         box-sizing: border-box;
         width: 12cm !important; height: 9cm !important;
-        margin: 10mm auto 0 !important; padding: 5mm !important;
+        margin: 5mm auto 0 !important; padding: 5mm 5mm 4mm !important;
         border: none !important; box-shadow: none !important;
         overflow: hidden !important;
         -webkit-print-color-adjust: exact; print-color-adjust: exact; /* 底色需随打印输出 */
-        page-break-after: always; break-after: page;
       }
-      .card:last-of-type { page-break-after: auto; break-after: auto; }
       .risk-table td { border: 1.5px solid #000 !important; }
       .risk-table td.red,
       .risk-table td.yellow,
@@ -294,6 +322,8 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
 
   patient: any | null = null;
   loading = false;
+  /** 进入本模块时的当前日期（yyyy-MM-dd），卡片下方右侧展示，打印时标签换"打印日期：" */
+  readonly cardDate: string = formatYmd(new Date());
   /** 各单元格（固定部分：标题 + 姓名/床号 + 5 行风险） */
   cells: CardCell[][] = this.defaultCells();
   /** 自定义行（"新增行"追加，存 bedsideRiskCardRow 集合，_id 序 = 追加序） */
@@ -368,13 +398,13 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
 
   /**
    * 标签字号（pt）：随行数自动缩放，保证整表始终落在 12cm×9cm 卡片内。
-   * 可用高度 = 卡片 9cm − 上下 padding 1cm − 标题行 1.2cm = 6.8cm；
-   * 每行分得 68/行数 mm，除以单行安全需求 7.5mm（15pt×1.3 行高再留余量）得缩放比。
+   * 可用高度 = 卡片 9cm − padding（上 5mm 下 4mm） − 标题行 1.2cm = 6.9cm；
+   * 每行分得 69/行数 mm，除以单行安全需求 7.5mm（15pt×1.3 行高再留余量）得缩放比。
    * 固定 6 行（无自定义行）时比值 ≥ 1 → 恒为 15pt，现有打印格式不变。
    */
   get labelFontPt(): number {
     const rowCount = 6 + this.displayRows.length; // 姓名/床号行 + 5 行风险 + 自定义行
-    const rowH = 68 / rowCount;                   // 每行可用高度（mm）
+    const rowH = 69 / rowCount;                   // 每行可用高度（mm）
     const scale = Math.min(1, Math.max(0.5, rowH / 7.5));
     return Math.round(15 * scale * 10) / 10;
   }
