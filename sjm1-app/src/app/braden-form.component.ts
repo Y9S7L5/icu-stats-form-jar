@@ -156,7 +156,14 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
               <td class="total-col">{{seg.row && seg.isFirst && seg.row.total !== null ? seg.row.total : ''}}</td>
               <td class="risk-col">{{seg.row && seg.isFirst ? seg.row.risk : ''}}</td>
               <ng-container *ngFor="let m of MEASURE_COLUMNS"><td class="measure-cell">{{seg.row && seg.isFirst ? measureCheck(seg.row, m) : ''}}</td></ng-container>
-              <td class="other-cell"><span class="cell-text" *ngIf="seg.row && seg.row.other" [class.clipped]="!seg.isWhole" [style.height.px]="seg.row && !seg.isWhole ? seg.heightPx : null" [style.marginTop.px]="seg.row && !seg.isWhole ? -seg.offsetPx : null">{{seg.row.other}}</span></td>
+              <!-- 整行直接渲染；拆行片段用「固定高窗口容器 + 内部 transform 平移」精确显示
+                   文本 [offsetPx, offsetPx+heightPx) 区间。旧实现用负 margin 开窗会被
+                   vertical-align:middle 重新居中，导致续行窗口起点漂移（与上一页内容重复）、
+                   终点提前（尾部内容丢失）。 -->
+              <td class="other-cell">
+                <span class="cell-text" *ngIf="seg.row && seg.row.other && seg.isWhole">{{seg.row.other}}</span>
+                <span class="cell-text-window" *ngIf="seg.row && seg.row.other && !seg.isWhole" [style.height.px]="seg.heightPx"><span class="cell-text" [style.transform]="'translateY(' + (-seg.offsetPx) + 'px)'">{{seg.row.other}}</span></span>
+              </td>
               <td class="sign-col">{{seg.row && seg.isLast ? (seg.row.signName || '') : ''}}</td>
             </tr>
           </tbody>
@@ -256,7 +263,8 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
     .measure-cell{width:22px;min-width:22px;font-size:12px}
     .other-col{width:305px;min-width:305px}
     .record-table td.other-cell{width:305px;min-width:305px;text-align:left;padding-left:2px;white-space:pre-wrap;word-break:break-word}
-    .record-table td.other-cell .cell-text.clipped{display:block;overflow:hidden}
+    .record-table td.other-cell .cell-text-window{display:block;overflow:hidden}
+    .record-table td.other-cell .cell-text-window .cell-text{display:block}
     .sign-col{width:44px;min-width:44px}
     .vtext{display:inline-block;writing-mode:vertical-lr;text-orientation:upright;white-space:normal;line-height:10px;letter-spacing:0;font-family:'SimSun','宋体',serif;font-size:10px;font-weight:400;font-style:normal;color:#000;text-shadow:none;text-rendering:auto;-webkit-font-smoothing:auto;transform:none;filter:none;opacity:1;margin:0 auto}
     .dt-date,.dt-time{display:block;white-space:nowrap;word-break:normal;text-align:center;line-height:1.2}
