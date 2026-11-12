@@ -988,7 +988,10 @@ export class BradenFormComponent implements OnInit, OnDestroy {
     const ppm = this.pxPerMm();
     // 打印页数据行可用高度：A4 横向 209mm - 上下 padding 7mm×2 - 固定区 - 余量
     const contentPx = (209 - 14) * ppm;
-    const safetyPx = 5 * ppm;
+    // 余量须盖过页码带：.sheet-pageno 定位 bottom:35px、12pt/行高1，占 [35,51]px，
+    // 顶边约在纸面底缘上方 13.5mm，侵入内容区约 6.5mm。余量取 7.5mm 使表格底边
+    // 停在页码上方约 1mm；旧值 5mm 不够，满页时表格底线会压在「第 N 页」上。
+    const safetyPx = 7.5 * ppm;
     const fixedPx = head.getBoundingClientRect().height + thead.getBoundingClientRect().height;
     const footerPx = ['.result-line', '.footnote', '.review-sign'].reduce((sum, sel) => {
       const el = root.querySelector(sel) as HTMLElement | null;
