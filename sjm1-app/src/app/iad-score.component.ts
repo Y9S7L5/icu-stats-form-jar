@@ -137,16 +137,17 @@ interface RenderPage { index: number; rows: (IadRow | null)[]; diagnosis?: strin
       <section class="sheet" [class.sheet-hidden]="!isPrintPageSelected(page.index)" [class.last-sheet]="page.index === pages.length">
         <div class="sheet-head">
           <div class="title-line">{{hospitalName}}成人失禁相关性皮炎分类及会阴部皮肤评估护理记录单</div>
-        </div>
-
-        <div class="patient-info-row">
-          <span class="info-item"><b>科室：</b>{{patient?.dept || patient?.deptName || patient?.departmentName || patient?.wardName || ''}}</span>
-          <span class="info-item"><b>姓名：</b>{{patient?.name || ''}}</span>
-          <span class="info-item"><b>床号：</b>{{ (patient?.hisBed || patient?.bedNo) ? ((patient?.hisBed || patient?.bedNo).endsWith('床') ? (patient?.hisBed || patient?.bedNo) : (patient?.hisBed || patient?.bedNo) + '床') : '' }}</span>
-          <span class="info-item"><b>住院号：</b>{{patient?.mrn || patient?.hospitalNo || ''}}</span>
-          <span class="info-item"><b>年龄：</b>{{age ?? ''}}</span>
-          <span class="info-item"><b>性别：</b>{{genderText(patient?.gender)}}</span>
-          <span class="info-item diagnosis-item"><b>诊断：</b>{{page.diagnosis || diagnosisDisplay}}</span>
+          <!-- 患者信息行须放在 sheet-head 内：分页实测固定区高度量的是 .sheet-head 整体，
+               放外面会漏掉约5mm，满页表格底线压进页码带 -->
+          <div class="patient-info-row">
+            <span class="info-item"><b>科室：</b>{{patient?.dept || patient?.deptName || patient?.departmentName || patient?.wardName || ''}}</span>
+            <span class="info-item"><b>姓名：</b>{{patient?.name || ''}}</span>
+            <span class="info-item"><b>床号：</b>{{ (patient?.hisBed || patient?.bedNo) ? ((patient?.hisBed || patient?.bedNo).endsWith('床') ? (patient?.hisBed || patient?.bedNo) : (patient?.hisBed || patient?.bedNo) + '床') : '' }}</span>
+            <span class="info-item"><b>住院号：</b>{{patient?.mrn || patient?.hospitalNo || ''}}</span>
+            <span class="info-item"><b>年龄：</b>{{age ?? ''}}</span>
+            <span class="info-item"><b>性别：</b>{{genderText(patient?.gender)}}</span>
+            <span class="info-item diagnosis-item"><b>诊断：</b>{{page.diagnosis || diagnosisDisplay}}</span>
+          </div>
         </div>
 
         <table class="record-table">
