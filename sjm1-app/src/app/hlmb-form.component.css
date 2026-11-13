@@ -1,0 +1,69 @@
+:host{display:block;height:100vh;overflow:auto;background:#f0f2f5;color:#000}
+.toolbar{position:sticky;top:0;z-index:10;display:flex;justify-content:flex-end;gap:12px;align-items:center;padding:10px 18px;background:#fff;border-bottom:1px solid #ddd}
+.btn{min-height:36px;padding:6px 18px;border:1px solid #1877d3;border-radius:4px;background:#fff;cursor:pointer;font:inherit}
+.btn.primary{background:#1877d3;color:#fff}
+.btn:disabled{cursor:not-allowed;opacity:.55}
+.status{padding:12px 18px}
+.error{color:#b42318}
+.print-page{width:210mm;min-height:297mm;margin:16px auto}
+.sheet{box-sizing:border-box;position:relative;width:210mm;height:297mm;padding:7mm 10mm 14mm;overflow:hidden;background:#fff;box-shadow:0 2px 8px #0002;font-family:"SimSun","宋体",serif}
+h1{margin:0 0 3mm;text-align:center;font:700 16pt SimHei,"黑体",sans-serif;letter-spacing:.5px}
+.patient-info{display:flex;gap:6mm;margin:0 0 2mm;font-size:10.5pt;white-space:nowrap}
+.patient-info .info-item{flex:0 0 auto}
+.patient-info .diagnosis{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.goal-table{width:100%;border-collapse:collapse;table-layout:fixed;font-family:"SimSun","宋体",serif;font-size:9pt;line-height:1.2}
+.goal-table th,.goal-table td{border:1px solid #000;padding:.6mm 1mm;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:break-all}
+.goal-table th{background:#fff;font-weight:700}
+.goal-table td.sys{font-weight:700;letter-spacing:1px}
+.goal-table td.item{font-weight:700}
+.sys-col{width:9mm}
+.item-col{width:17mm}
+.sub-col{width:15mm}
+.target-col{width:44mm}
+.date-col{width:26.25mm}
+.goal-table tbody td{height:9.2mm}
+.goal-table thead th{height:6.5mm}
+/* 日期列头 yyyy-MM-dd HH:mm，略缩字号避免超宽 */
+.goal-table thead tr:last-child th{font-size:7.5pt;white-space:nowrap;padding:.6mm .2mm}
+.sign-row td{height:10mm}
+.page-no{position:absolute;left:0;right:0;bottom:35px;text-align:center;font-family:'SimSun','宋体',serif;font-size:12pt;font-weight:400;line-height:1;color:#000;white-space:nowrap}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  :host{height:auto;overflow:visible;background:#fff}
+  .no-print,.status,.overlay{display:none!important}
+  .print-hidden{display:none!important}
+  .print-page{width:210mm;height:297mm;min-height:297mm;margin:0;break-after:page}
+  .print-page:last-child{break-after:auto}
+  .sheet{box-shadow:none;margin:0}
+}
+.overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.42)}
+.dialog{display:flex;flex-direction:column;background:#fff;border:1px solid #d8dee8;border-radius:4px;box-shadow:0 20px 50px rgba(0,0,0,.2);overflow:hidden;color:#000}
+.form-dialog{width:min(860px,94vw);max-height:90vh}
+.list-dialog{width:min(720px,94vw)}
+.dialog-head{flex:0 0 48px;height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb}
+.dialog-head h2{margin:0;font-size:17px}
+.icon-btn{width:40px;height:40px;border:0;background:transparent;font-size:28px;color:#64748b;cursor:pointer}
+.form-body{padding:12px 16px;overflow-y:auto}
+.record-list{padding:18px;overflow:auto;max-height:60vh}
+.record-list table{width:100%;border-collapse:collapse}
+.record-list th{background:#eef4ff;font-weight:500}
+.record-list th,.record-list td{padding:11px;border-bottom:1px solid #e5e7eb;text-align:center}
+.record-list .empty{padding:24px;color:#94a3b8}
+.text-btn{border:0;background:transparent;color:#2783de;cursor:pointer;padding:6px 10px;font:inherit}
+.text-btn.danger{color:#dc2626}
+.text-btn:disabled{cursor:not-allowed;opacity:.6}
+.dialog-foot{display:flex;justify-content:flex-end;gap:10px;padding:10px 16px;border-top:1px solid #e5e7eb;background:#f8fafc}
+.dialog-btn{padding:5px 16px;border-radius:4px;font-family:'SimSun','宋体',serif;font-size:14px;cursor:pointer}
+.dialog-btn:disabled{cursor:not-allowed;opacity:.6}
+.save-btn{border:1px solid #1877d3;background:#1877d3;color:#fff}
+.cancel-btn{border:1px solid #ccc;background:#fff;color:#333}
+.form-error{margin-top:12px;padding:10px;border-radius:6px;background:#fce9e7;color:#b42318}
+.record-time-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.record-time-row label{font-weight:600;white-space:nowrap}
+.record-time-row input{padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font:inherit}
+.record-time-row select{padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font:inherit;background:#fff;min-width:160px}
+.param-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.param-item{display:flex;align-items:center;gap:8px}
+.param-item label{flex:0 0 auto;min-width:130px;font-size:13px;line-height:1.4}
+.param-item input{flex:1;min-width:0;padding:5px 8px;border:1px solid #cbd5e1;border-radius:4px;font:inherit}
+@media(max-width:760px){.param-grid{grid-template-columns:1fr}.param-item label{min-width:0}}

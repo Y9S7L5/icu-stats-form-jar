@@ -13,6 +13,7 @@
 | 住院患者日常生活能力评估单（Barthel） | /form/baetheiForm | BaetheiScoreComponent | /api/v1/icu/scores, /api/v1/icu/self-care-extra | Score, SelfCareFormExtra | 是 |
 | 跌倒/坠床风险评估及预防措施记录单 | /form/patientFallDangerForm | PatientFallDangerComponent | /api/v1/icu/scores, /api/v1/icu/fall-danger-extra | Score, FallDangerFormExtra | 是 |
 | 健康教育记录单 | /form/jkjyForm | HealthEducationComponent | /api/v1/icu/health-education | HealthEducationRecord | 是 |
+| 重症患者护理目标管理 | /form/hlmbForm | HlmbFormComponent | /api/v1/icu/nursing-goal-records | NursingGoalRecord | 是 |
 | 住院患者物品管理表 | /form/wpgmForm | WpgmFormComponent | 无（仅浏览器 localStorage） | 无 | 否 |
 | ECMO 运行护理记录单 | /form/ecmoForm | EcmoRecordComponent | /api/v1/icu/bedside/listByPid, /api/v1/icu/ecmo-extra | Bedside, EcmoRecordExtra | 是 |
 | 输血记录单（第三方输血系统调阅） | /form/transfusionForm | TransfusionSystemComponent | 无（iframe 调阅输血系统，sign 由 SM4-ECB 生成） | — | 否 |

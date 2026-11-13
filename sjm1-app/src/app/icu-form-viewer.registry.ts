@@ -58,4 +58,5 @@ export const ICU_VIEWER_FORMS: IcuFormViewerFormDef[] = [
   /* ── 护理记录 ── */
   { key: 'jkjyForm', title: '健康教育记录单', route: 'jkjyForm' },
   { key: 'wpgmForm', title: '住院患者物品管理表', route: 'wpgmForm' },
+  { key: 'hlmbForm', title: '重症患者护理目标管理', route: 'hlmbForm' },
 ];

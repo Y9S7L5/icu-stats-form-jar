@@ -21,7 +21,7 @@ const FORM_CODE = 'patientFallDangerForm';
 const CLINICAL = [
   { key: 'hunmiOntanhaun', label: '昏迷或完全瘫痪' },
   { key: 'preHospitalization', label: '过去24小时曾有手术麻醉史' },
-  { key: 'sylzys', label: '使用两种及以上镇静安眠药物' },
+  { key: 'sylzys', label: '使用两种及以上高跌倒风险药物' },
   { key: 'age', label: '年龄≥80岁' },
   { key: 'thisHospitalization', label: '住院前6个月/住院期间有跌倒经历' },
   { key: 'exist', label: '存在步态不稳、关节/肌肉疼痛、视觉障碍等' },
@@ -146,7 +146,7 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
             <!-- HR3 评估行 -->
             <tr class="eval-row">
               <th class="cond-col vtext" rowspan="2">过去24小时曾有手术麻醉史</th>
-              <th class="cond-col vtext" rowspan="2">使用两种及以<br>上镇静安眠药物</th>
+              <th class="cond-col vtext" rowspan="2">使用两种及以<br>上高跌倒风险药物</th>
               <th class="cond-col vtext" rowspan="2">年龄≥80岁</th>
               <th class="cond-col cond-wide vtext" rowspan="2">住院前6个月内有跌倒经历/住院期间此次有跌倒经历</th>
               <th class="cond-col cond-wide vtext" rowspan="2">存在步态不稳、关节疼痛、肌肉疼痛、视觉障碍等</th>

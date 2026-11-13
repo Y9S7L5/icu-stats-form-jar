@@ -24,6 +24,7 @@ import { PrintCenterComponent } from './print-center.component';
 import { IcuFormViewerComponent } from './icu-form-viewer.component';
 import { SggrfkcsFormComponent } from './sggrfkcs-form.component';
 import { BedsideRiskCardComponent } from './bedside-risk-card.component';
+import { HlmbFormComponent } from './hlmb-form.component';
 
 export const routes: Routes = [
   { path: 'getIcuForm', component: IcuFormViewerComponent },
@@ -51,6 +52,7 @@ export const routes: Routes = [
   { path: 'unPlannedCGZYYForm', component: UnplannedExtubationComponent },
   { path: 'sggrfkcsForm', component: SggrfkcsFormComponent },
   { path: 'bedsideRiskCardForm', component: BedsideRiskCardComponent },
+  { path: 'hlmbForm', component: HlmbFormComponent },
   { path: 'printCenter', component: PrintCenterComponent },
   { path: '', redirectTo: 'getIcuForm', pathMatch: 'full' },
 ];

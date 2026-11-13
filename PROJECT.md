@@ -74,6 +74,7 @@ icu-stats-form-jar/
 | radenForm | BradenFormComponent | 压力性损伤评估及措施记录单 | ✅ |
 | 	ransfusionForm | TransfusionRecordComponent | 输血记录单 | ✅ |
 | piccoForm | PiccoRecordComponent | PiCCO 监测记录单 | ✅ |
+| hlmbForm | HlmbFormComponent | 重症患者护理目标管理 | ✅ |
 | iabpForm | IabpRecordComponent | IABP 护理记录单 | ✅ |
 | crrtForm | CrrtRecordComponent | CRRT 护理记录单 | ✅ |
 | crrtOrderForm | CrrtOrderFormComponent | CRRT 医嘱单 | ✅ |

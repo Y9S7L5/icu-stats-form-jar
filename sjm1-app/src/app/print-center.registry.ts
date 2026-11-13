@@ -13,6 +13,7 @@ import { WpgmFormComponent } from './wpgm-form.component';
 import { EcmoRecordComponent } from './ecmo-record.component';
 import { TransfusionRecordComponent } from './transfusion-record.component';
 import { PiccoRecordComponent } from './picco-record.component';
+import { HlmbFormComponent } from './hlmb-form.component';
 import { IabpRecordComponent } from './iabp-record.component';
 import { CrrtRecordComponent } from './crrt-record.component';
 import { CrrtOrderFormComponent } from './crrt-order-form.component';
@@ -90,6 +91,11 @@ export const PRINT_FORMS: PrintFormDef[] = [
     key: 'piccoForm', title: 'PiCCO 监测记录单', route: 'piccoForm', group: 'therapy',
     orientation: 'portrait', component: PiccoRecordComponent,
     probe: { kind: 'url', url: '/api/v1/icu/picco-params/listByPid' },
+  },
+  {
+    key: 'hlmbForm', title: '重症患者护理目标管理', route: 'hlmbForm', group: 'nursing',
+    orientation: 'portrait', component: HlmbFormComponent,
+    probe: { kind: 'url', url: '/api/v1/icu/nursing-goal-records/listByPid' },
   },
   {
     key: 'iabpForm', title: 'IABP 护理记录单', route: 'iabpForm', group: 'therapy',

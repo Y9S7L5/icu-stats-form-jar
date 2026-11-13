@@ -40,6 +40,7 @@ import { PrintPageMultiSelectComponent } from './print-page-multi-select.compone
 import { IcuFormViewerComponent } from './icu-form-viewer.component';
 import { SggrfkcsFormComponent } from './sggrfkcs-form.component';
 import { BedsideRiskCardComponent } from './bedside-risk-card.component';
+import { HlmbFormComponent } from './hlmb-form.component';
 import { routes } from './app.routes';
 
 @NgModule({
@@ -71,6 +72,7 @@ import { routes } from './app.routes';
     UnplannedExtubationComponent,
     SggrfkcsFormComponent,
     BedsideRiskCardComponent,
+    HlmbFormComponent,
     PrintPageMultiSelectComponent,
     IcuFormViewerComponent,
     DomSafePipe,

@@ -116,6 +116,16 @@ public class FormAvailabilityController {
             result.put("piccoForm", toResponse("piccoForm", count));
         }, executor));
 
+        // ── 重症患者护理目标管理记录 ──
+        futures.add(CompletableFuture.runAsync(() -> {
+            long count = mongoTemplate.count(
+                Query.query(Criteria.where("pid").is(pid)
+                    .and("valid").is(true)),
+                "nursingGoalRecord"
+            );
+            result.put("hlmbForm", toResponse("hlmbForm", count));
+        }, executor));
+
         // ── 健康教育记录 ──
         futures.add(CompletableFuture.runAsync(() -> {
             long count = mongoTemplate.count(

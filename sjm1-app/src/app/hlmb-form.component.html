@@ -1,0 +1,224 @@
+<div class="toolbar no-print" *ngIf="!isViewerMode">
+  <button class="btn" type="button" (click)="openCreate()" [disabled]="!patient">新增</button>
+  <button class="btn" type="button" (click)="openEditList()" [disabled]="!patient">编辑</button>
+  <app-print-page-multi-select [totalPages]="pages.length" [(selectedPages)]="selectedPrintPages" [disabled]="loading"></app-print-page-multi-select>
+  <button class="btn primary" (click)="print()">打印</button>
+</div>
+<div *ngIf="loading" class="status">加载中…</div>
+<div *ngIf="loadError" class="status error">{{loadError}} <button (click)="load()">重试</button></div>
+
+<section class="print-page" *ngFor="let page of pages" [class.print-hidden]="printing && !isPrintPageSelected(page.index)">
+  <div class="sheet">
+    <h1>重钢总医院重症医学科重症患者护理目标管理</h1>
+    <div class="patient-info">
+      <span class="info-item"><b>姓名：</b>{{patient?.name||''}}</span>
+      <span class="info-item"><b>床号：</b>{{patient?.hisBed ? (patient.hisBed.endsWith('床') ? patient.hisBed : patient.hisBed + '床') : ''}}</span>
+      <span class="info-item"><b>住院号：</b>{{patient?.mrn||''}}</span>
+      <span class="info-item diagnosis"><b>诊断：</b>{{diagnosisDisplay}}</span>
+    </div>
+    <table class="goal-table">
+      <colgroup>
+        <col class="sys-col">
+        <col class="item-col">
+        <col class="sub-col">
+        <col class="target-col">
+        <col class="date-col" *ngFor="let i of [0,1,2,3]">
+      </colgroup>
+      <thead>
+        <tr>
+          <th rowspan="2">系统分类</th>
+          <th colspan="2" rowspan="2">项目</th>
+          <th rowspan="2">目标</th>
+          <th colspan="4">日期</th>
+        </tr>
+        <tr>
+          <th *ngFor="let slot of page.slots">{{displayDate(slot)}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 生命体征 -->
+        <tr>
+          <td rowspan="7" class="sys">生命体征</td>
+          <td rowspan="4" class="item">体温(℃)</td>
+          <td>正常</td>
+          <td>36.3~37.2</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'temp_normal')}}</td>
+        </tr>
+        <tr>
+          <td>亚低温</td>
+          <td>33~35</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'temp_hypo')}}</td>
+        </tr>
+        <tr>
+          <td rowspan="2" class="item">复温</td>
+          <td>腋温36~37</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'temp_rewarm_axilla')}}</td>
+        </tr>
+        <tr>
+          <td>肛温35~36.5</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'temp_rewarm_rectal')}}</td>
+        </tr>
+        <tr>
+          <td rowspan="3" class="item">血压(mmhg)</td>
+          <td>无创</td>
+          <td>正常</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'bp_nibp')}}</td>
+        </tr>
+        <tr>
+          <td>有创</td>
+          <td>正常</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'bp_ibp')}}</td>
+        </tr>
+        <tr>
+          <td>MAP</td>
+          <td>65~90</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'bp_map')}}</td>
+        </tr>
+        <!-- 呼吸系统 -->
+        <tr>
+          <td rowspan="3" class="sys">呼吸系统</td>
+          <td colspan="2" class="item">SP0₂</td>
+          <td>&gt;92%</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'spo2')}}</td>
+        </tr>
+        <tr>
+          <td colspan="2" class="item">氧分压</td>
+          <td>80~120</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'pao2')}}</td>
+        </tr>
+        <tr>
+          <td colspan="2" class="item">俯卧位通气时间</td>
+          <td>&gt;12h</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'prone_hours')}}</td>
+        </tr>
+        <!-- 循环系统 -->
+        <tr>
+          <td rowspan="3" class="sys">循环系统</td>
+          <td colspan="2" class="item">心率(次/分)</td>
+          <td>60~100</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'hr')}}</td>
+        </tr>
+        <tr>
+          <td colspan="2" class="item">CVP(cmH20)</td>
+          <td>5~12</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'cvp')}}</td>
+        </tr>
+        <tr>
+          <td colspan="2" class="item">出入量</td>
+          <td>平衡</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'io_balance')}}</td>
+        </tr>
+        <tr>
+          <td colspan="3" class="item">尿量</td>
+          <td>(0.5mL/kg/h) 或 &gt;30ml/h</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'urine')}}</td>
+        </tr>
+        <!-- 神经系统 -->
+        <tr>
+          <td rowspan="3" class="sys">神经系统</td>
+          <td colspan="2" class="item">ICP(mmHg)</td>
+          <td>5~15</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'icp')}}</td>
+        </tr>
+        <tr>
+          <td colspan="2" class="item">脑室外引流(ml)</td>
+          <td rowspan="2">&lt;20mL/h</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'ecf_drain')}}</td>
+        </tr>
+        <tr>
+          <td colspan="2" class="item">腰大池引流(ml)</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'lumbar_drain')}}</td>
+        </tr>
+        <!-- 镇痛镇静 -->
+        <tr>
+          <td rowspan="3" class="sys">镇痛镇静</td>
+          <td class="item">镇痛</td>
+          <td>CPOT</td>
+          <td>0~3</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'cpot')}}</td>
+        </tr>
+        <tr>
+          <td rowspan="2" class="item">镇静</td>
+          <td>RASS</td>
+          <td>-2~+1</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'rass')}}</td>
+        </tr>
+        <tr>
+          <td  class="item">唤醒时间</td>
+          <td>每日10:00</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'wake_time')}}</td>
+        </tr>
+        <!-- 营养 -->
+        <tr>
+          <td class="sys">营养</td>
+          <td colspan="2" class="item">血糖</td>
+          <td>7~10mmol/L</td>
+          <td *ngFor="let slot of page.slots">{{val(slot,'glucose')}}</td>
+        </tr>
+        <!-- 医生签名 -->
+        <tr class="sign-row">
+          <td colspan="4" class="sign-label">医生签名</td>
+        
+          <td *ngFor="let slot of page.slots">{{signAt(slot)}}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="page-no">第 {{page.index}} 页</div>
+  </div>
+</section>
+
+<div class="overlay no-print" *ngIf="recordListOpen" (click)="recordListOpen=false">
+  <section class="dialog list-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-head"><h2>编辑护理目标记录</h2><button class="icon-btn" (click)="recordListOpen=false">×</button></div>
+    <div class="record-list">
+      <table>
+        <thead><tr><th>No</th><th>记录日期</th><th>填写项</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let r of records;let i=index">
+            <td>{{i+1}}</td>
+            <td>{{fmtRecordDate(r.recordDate)}}</td>
+            <td>{{paramCount(r)}} 项</td>
+            <td>
+              <button class="text-btn" (click)="editRecord(r)">编辑</button>
+              <button class="text-btn danger" (click)="invalidateRecord(r)" [disabled]="deletingId===r.id">{{deletingId===r.id?'删除中…':'删除'}}</button>
+            </td>
+          </tr>
+          <tr *ngIf="!records.length"><td colspan="4" class="empty">暂无记录</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="overlay no-print" *ngIf="recordFormOpen" (click)="recordFormOpen=false">
+  <section class="dialog form-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-head">
+      <h2>{{recordEditing?'编辑护理目标记录':'新增护理目标记录'}}</h2>
+      <button class="icon-btn" (click)="recordFormOpen=false" [disabled]="recordSaving">×</button>
+    </div>
+    <div class="form-body">
+      <div class="record-time-row">
+        <label>记录时间</label>
+        <input type="datetime-local" [(ngModel)]="recordForm.recordDate">
+      </div>
+      <div class="record-time-row">
+        <label>医生签名</label>
+        <select [(ngModel)]="recordForm.signId">
+          <option value="">（空）</option>
+          <option *ngFor="let a of accounts" [value]="a.accountId">{{a.accountName}}</option>
+        </select>
+      </div>
+      <div class="param-grid">
+        <div class="param-item" *ngFor="let it of items">
+          <label>{{it.label}}</label>
+          <input type="text" placeholder="请输入" [(ngModel)]="recordForm.values[it.code]">
+        </div>
+      </div>
+      <div class="form-error" *ngIf="recordError">{{recordError}}</div>
+    </div>
+    <div class="dialog-foot">
+      <button class="dialog-btn cancel-btn" (click)="recordFormOpen=false" [disabled]="recordSaving">取消</button>
+      <button class="dialog-btn save-btn" (click)="saveRecord()" [disabled]="recordSaving">{{recordSaving?'保存中…':'保存'}}</button>
+    </div>
+  </section>
+</div>

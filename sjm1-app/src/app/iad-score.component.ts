@@ -217,16 +217,19 @@ interface RenderPage { index: number; rows: (IadRow | null)[]; diagnosis?: strin
           </tbody>
         </table>
 
-        <!-- 备注与审核护士签名仅末页展示（与 Braden 压疮评估单一致） -->
-        <div class="iad-footnote" *ngIf="page.index === pages.length">
-          <div class="footnote-title">备注：</div>
-          <div class="fn">1、IAD分类：对应栏内打"√"；IAD 0级患者，每日评估1次，对于1级、2级患者，每日评估2次。</div>
-          <div class="fn">2、PAT量表采用 Likert 3 点计分法，各部分评分最佳至最差为 1~3 分；总分 4~12 分，4~6 分为低风险，7~12 分为高风险。</div>
-          <div class="fn">3、PAT量表中相关影响因素有：低蛋白、使用抗生素、管饲饮食、艰难梭状芽孢杆菌、其他。</div>
-          <div class="fn">4、护理措施：</div>
-          <div class="fn" *ngFor="let m of MEASURE_LEGEND">{{ m }}</div>
+        <!-- 备注与审核护士签名仅末页展示（与 Braden 压疮评估单一致）。
+             footnoteLevel 0~3 备注块压缩级别：数据少、备注放不下会把尾行挤到新页时自动缩小省页 -->
+        <div class="footnote-wrap" *ngIf="page.index === pages.length">
+          <div class="iad-footnote" [class.lv1]="footnoteLevel >= 1" [class.lv2]="footnoteLevel >= 2" [class.lv3]="footnoteLevel >= 3">
+            <div class="footnote-title">备注：</div>
+            <div class="fn">1、IAD分类：对应栏内打"√"；IAD 0级患者，每日评估1次，对于1级、2级患者，每日评估2次。</div>
+            <div class="fn">2、PAT量表采用 Likert 3 点计分法，各部分评分最佳至最差为 1~3 分；总分 4~12 分，4~6 分为低风险，7~12 分为高风险。</div>
+            <div class="fn">3、PAT量表中相关影响因素有：低蛋白、使用抗生素、管饲饮食、艰难梭状芽孢杆菌、其他。</div>
+            <div class="fn">4、护理措施：</div>
+            <div class="fn fn-para">{{ MEASURE_PARAGRAPH }}</div>
+          </div>
+          <div class="review-sign">审核护士签名：{{ auditorName || '__________' }}</div>
         </div>
-        <div class="review-sign" *ngIf="page.index === pages.length">审核护士签名：{{ auditorName || '__________' }}</div>
         <div class="sheet-pageno">第 {{page.index}} 页</div>
       </section>
     </ng-container>
@@ -273,11 +276,17 @@ interface RenderPage { index: number; rows: (IadRow | null)[]; diagnosis?: strin
     /* 日期两行 */
     .dt-date,.dt-time{display:block;white-space:nowrap;word-break:normal;text-align:center;line-height:1.25}
 
-    /* 备注：仅末页展示 */
-    .iad-footnote{box-sizing:border-box;width:100%;margin-top:2px;margin-bottom:10mm;padding:0 2px;font-family:'SimSun','宋体',serif;font-size:9.5pt;font-weight:400;line-height:1.3;color:#000;text-align:left}
+    /* 备注：仅末页展示；footnoteLevel 1~3 逐级压缩（字号/行高减小、A~I 图例 2/3 栏），放不下才缩 */
+    .footnote-wrap{box-sizing:border-box;width:100%;padding:2px 0 6mm;color:#000}
+    .iad-footnote{box-sizing:border-box;width:100%;padding:0 2px;font-family:'SimSun','宋体',serif;font-size:9.5pt;font-weight:400;line-height:1.3;text-align:left}
     .iad-footnote .footnote-title{font-weight:700}
     .iad-footnote .fn{margin:0;padding-left:2em;text-indent:-2em}
-    .review-sign{margin-top:-24px;text-align:right;font-family:'SimSun','宋体',serif;font-size:13pt;font-weight:400;padding-right:6px}
+    /* 护理措施 A~I 为一段连续文字，整体齐左不悬挂 */
+    .iad-footnote .fn-para{padding-left:0;text-indent:0}
+    .iad-footnote.lv1{font-size:9pt;line-height:1.24}
+    .iad-footnote.lv2{font-size:8.5pt;line-height:1.2}
+    .iad-footnote.lv3{font-size:8pt;line-height:1.15}
+    .review-sign{margin:3mm 0 0;text-align:right;font-family:'SimSun','宋体',serif;font-size:13pt;font-weight:400;padding-right:6px}
     .sheet-pageno{position:absolute;right:0;bottom:35px;left:0;width:auto;margin:0;padding:0;box-sizing:border-box;text-align:center;font-family:'SimSun','宋体',serif;font-size:12pt;font-weight:400;line-height:1;color:#000;white-space:nowrap;pointer-events:none;z-index:20}
 
     @media screen{.sheet{width:calc(100vw - 32px);max-width:297mm;min-width:980px;zoom:1!important;transform:none!important}}
@@ -301,11 +310,12 @@ export class IadScoreComponent implements OnInit, OnDestroy {
   // 供模板引用
   readonly IAD_LEVELS = IAD_LEVELS;
   readonly PAT_ROWS = PAT_ROWS;
-  readonly MEASURE_LEGEND = MEASURE_LEGEND;
+  /** 备注 4 正文：护理措施 A~I 合并为一段连续文字（统一版式） */
+  readonly MEASURE_PARAGRAPH = MEASURE_LEGEND.join('');
 
   /** 每页新起数据行数上限（中间页满槽 12；末页可少于 12 但不截断） */
   readonly maxRowsPerPageMultiPage = 12;
-  /** 末页空白补白目标行数（数据 <8 时补齐） */
+  /** 空白表单模板行数（仅无任何数据时单页补 8 行；有数据时不补空白行） */
   readonly maxRowsLastPage = 8;
   /** 最小行高（数据行内容超高时按实际高度撑开） */
   readonly baseRowHeight = 32;
@@ -314,8 +324,13 @@ export class IadScoreComponent implements OnInit, OnDestroy {
   private rowHeights = new Map<string, number>();
   /** 每页留给数据行的总高度（px）；未测量时为 Infinity，退化为纯行数分页 */
   private availableRowsPx = Number.POSITIVE_INFINITY;
-  /** 末页页脚（备注/审核签名）占高（px）；仅末页预留 */
+  /** 末页页脚（备注/审核签名）占高（px，0 级未压缩）；仅末页预留 */
   private footerReservedPx = 0;
+  /** 备注块 0~3 级压缩实测占高（px），下标=压缩级别 */
+  private footnoteLevelHeights: number[] = [];
+  /** 备注压缩级别：0=原大小，1~3=逐级缩小（字号/行高减小、图例分栏）。
+   *  备注太高会把末页数据行挤到新页；分页时逐级试算，选总页数最少的最小压缩级别（放得下就不缩） */
+  footnoteLevel = 0;
 
   loading = true;
   patient: any = null;
@@ -476,13 +491,13 @@ export class IadScoreComponent implements OnInit, OnDestroy {
     return [...new Set(out)].sort();
   }
 
-  /* ============================= 分页（Braden 模式：实测行高流式装页） ============================= */
+  /* ============================= 分页（Braden 模式：实测行高流式装页 + 备注自适应压缩） ============================= */
 
   private paginate(): void {
     // 第一遍：按既有行高切页渲染，保证每行都渲染过一次，量得到真实行高
     this.paginateByHeight();
     this.cdr.detectChanges();
-    // 第二遍：实测行高（图例/措施换行会撑高行）后按高度重切
+    // 第二遍：实测行高（图例/措施换行会撑高行）与备注各级压缩高度后重切
     if (this.measureRealHeights()) {
       this.paginateByHeight();
       this.cdr.detectChanges();
@@ -495,25 +510,23 @@ export class IadScoreComponent implements OnInit, OnDestroy {
     return h && h > 0 ? Math.max(h, this.baseRowHeight) : this.baseRowHeight;
   }
 
-  /** 按行高累计切页：一页放满才翻页（整行原子不跨页拆行）；每页新起数据行不超过 12。
-   *  未测量时 availableRowsPx=Infinity、行高=32px，退化为纯行数分页。 */
-  private paginateByHeight(): void {
-    if (!this.rows.length) {
-      const blanks: (IadRow | null)[] = [];
-      while (blanks.length < this.maxRowsLastPage) blanks.push(null);
-      this.pages = [{ index: 1, rows: blanks, diagnosis: this.diagnosisForRows([]) }];
-      this.normalizeSelectedPrintPages(this.pages.length);
-      return;
-    }
+  /** 备注块在该压缩级别的占高（px）；未实测到该级时退化为 0 级高度 */
+  private footerHeightFor(level: number): number {
+    const h = this.footnoteLevelHeights[level];
+    return h && h > 0 ? h : this.footerReservedPx;
+  }
 
+  /** 末页数据行可用高度 = 行区总高 - 该级备注占高（备注/审核签名仅末页展示） */
+  private availLastFor(level: number): number {
+    if (!Number.isFinite(this.availableRowsPx)) return Number.POSITIVE_INFINITY;
+    return Math.max(this.availableRowsPx - this.footerHeightFor(level), this.baseRowHeight);
+  }
+
+  /** 贪心装页（整行原子不跨页拆行；每页数据行 ≤12），末页放不下尾行时移到新页 */
+  private packPages(availLast: number): (IadRow | null)[][] {
     const avail = Number.isFinite(this.availableRowsPx)
       ? Math.max(this.availableRowsPx, this.baseRowHeight)
       : Number.POSITIVE_INFINITY;
-    const availLast = Number.isFinite(this.availableRowsPx)
-      ? Math.max(this.availableRowsPx - this.footerReservedPx, this.baseRowHeight)
-      : Number.POSITIVE_INFINITY;
-
-    // 贪心装页
     const pages: (IadRow | null)[][] = [];
     let cur: (IadRow | null)[] = [];
     let used = 0;
@@ -528,22 +541,32 @@ export class IadScoreComponent implements OnInit, OnDestroy {
       used += h;
     }
     if (cur.length) pages.push(cur);
-
     // 末页为「备注/审核签名」预留高度；放不下时把尾部行移到新页
     this.fitLastPageFooter(pages, availLast);
+    return pages;
+  }
 
-    // 末页补白：数据 <8 行且放得下时补齐
-    const last = pages[pages.length - 1];
-    if (last) {
-      let lastUsed = last.reduce((sum, r) => sum + (r ? this.rowHeight(r) : this.baseRowHeight), 0);
-      while (last.length < this.maxRowsLastPage) {
-        if (Number.isFinite(availLast) && lastUsed + this.baseRowHeight > availLast + 0.5) break;
-        last.push(null);
-        lastUsed += this.baseRowHeight;
-      }
+  /** 按行高切页 + 备注自适应压缩：备注太高会把末页数据行挤到新页（中间页只剩几行还留大片空白），
+   *  逐级试算 0~3 级备注高度，选总页数最少的最小压缩级别——放得下就不缩。
+   *  未测量时 availableRowsPx=Infinity、行高=32px，退化为纯行数分页。 */
+  private paginateByHeight(): void {
+    if (!this.rows.length) {
+      // 空白表单模板：单页 8 行空白（仅无任何记录时，非补白）；有数据时一律不补空白行
+      const blanks: (IadRow | null)[] = [];
+      while (blanks.length < this.maxRowsLastPage) blanks.push(null);
+      this.footnoteLevel = 0;
+      this.pages = [{ index: 1, rows: blanks, diagnosis: this.diagnosisForRows([]) }];
+      this.normalizeSelectedPrintPages(this.pages.length);
+      return;
     }
 
-    this.pages = pages.map((rows, i) => ({
+    // 逐级试算：0~3 级备注高度各切一次，取总页数最少者（并列取压缩最小的级别）——
+    // 放得下就不缩，放不下才缩到刚好省掉一整页
+    const trials = [0, 1, 2, 3].map(level => ({ level, pages: this.packPages(this.availLastFor(level)) }));
+    const best = trials.reduce((a, b) => (b.pages.length < a.pages.length ? b : a));
+    this.footnoteLevel = best.level;
+
+    this.pages = best.pages.map((rows, i) => ({
       index: i + 1,
       rows,
       diagnosis: this.diagnosisForRows(rows.filter((r): r is IadRow => !!r)),
@@ -591,14 +614,29 @@ export class IadScoreComponent implements OnInit, OnDestroy {
     // 停在页码上方约 1mm（与 Braden 一致）。
     const safetyPx = 7.5 * ppm;
     const fixedPx = head.getBoundingClientRect().height + thead.getBoundingClientRect().height;
-    const footerPx = ['.iad-footnote', '.review-sign'].reduce((sum, sel) => {
-      const el = root.querySelector(sel) as HTMLElement | null;
-      return sum + (el ? el.getBoundingClientRect().height : 0);
-    }, 0);
     const available = contentPx - fixedPx - safetyPx;
     if (!(available > 0)) return false;
     this.availableRowsPx = available;
-    this.footerReservedPx = footerPx;
+
+    // 页脚整体（备注 + 审核签名，.footnote-wrap 一体含 padding）逐级实测：
+    // 切换 footnoteLevel 0~3 重渲染后量高度，供分页按「总页数最少」选最小压缩级别
+    const wrap = root.querySelector('.footnote-wrap') as HTMLElement | null;
+    if (wrap) {
+      const prevLevel = this.footnoteLevel;
+      const heights: number[] = [];
+      for (let level = 0; level <= 3; level++) {
+        this.footnoteLevel = level;
+        this.cdr.detectChanges();
+        const h = wrap.getBoundingClientRect().height;
+        heights[level] = h > 0 ? h : (this.footnoteLevelHeights[level] || 0);
+      }
+      this.footnoteLevel = prevLevel;
+      this.cdr.detectChanges();
+      if (heights[0] > 0) {
+        this.footnoteLevelHeights = heights;
+        this.footerReservedPx = heights[0];
+      }
+    }
 
     const map = new Map<string, number>();
     root.querySelectorAll('tr[data-row-key]').forEach(tr => {
