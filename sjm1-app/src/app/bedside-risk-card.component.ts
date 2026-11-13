@@ -13,6 +13,7 @@
  *  - 自定义行     工具栏"新增行"在末尾追加，点击行可编辑文字/颜色并可删除，存库 bedsideRiskCardRow
  * 行数增多时标签字号按可用高度自动缩放（上限 15pt），卡片恒为 12cm×9cm 不超出。
  * 风险等级配色：高/极高风险（含高险/高危/高度危险）红底白字、中风险黄底白字、低风险（含低险/低危）绿底白字、未评估灰底白字。
+ * 固定行特殊配色：饮食有值（满足）绿底白字、接触隔离医嘱生效（满足）蓝底白字，未满足灰底白字。
  * 打印：前端浏览器打印，A4 纵向，卡片 12cm × 9cm 靠上水平居中，打印后裁剪使用。
  */
 import { HttpClient } from '@angular/common/http';
@@ -36,7 +37,7 @@ const BEDSIDE_PARAMS: BedsideParamDef[] = [
 ];
 
 /** 单元格配色等级 */
-type CellLevel = 'red' | 'yellow' | 'green' | 'gray' | 'none';
+type CellLevel = 'red' | 'yellow' | 'green' | 'blue' | 'gray' | 'none';
 
 interface CardCell {
   text: string;
@@ -229,14 +230,16 @@ function parseTimeMs(str: string | undefined): number {
     /* 自定义行：点击进入编辑；editing 为编辑中行的高亮 */
     .risk-table tr.custom-row { cursor: pointer; }
     .risk-table tr.custom-row.editing td { box-shadow: inset 0 0 0 2px #2563eb; }
-    /* 配色：红/黄/绿/灰底均为白字 */
+    /* 配色：红/黄/绿/蓝/灰底均为白字 */
     .risk-table td.red    { background: #d32f2f; }
     .risk-table td.yellow { background: #f9a825; }
     .risk-table td.green  { background: #43a047; }
+    .risk-table td.blue   { background: #1976d2; }
     .risk-table td.gray   { background: #9e9e9e; }
     .risk-table td.red .label,
     .risk-table td.yellow .label,
     .risk-table td.green .label,
+    .risk-table td.blue .label,
     .risk-table td.gray .label { color: #fff; }
     .risk-table td.none { background: #fff; }
     .risk-table td.none .label { color: #000; }
@@ -299,16 +302,19 @@ function parseTimeMs(str: string | undefined): number {
       .risk-table td.red,
       .risk-table td.yellow,
       .risk-table td.green,
+      .risk-table td.blue,
       .risk-table td.gray {
         -webkit-print-color-adjust: exact; print-color-adjust: exact;
       }
       .risk-table td.red    { background: #d32f2f !important; }
       .risk-table td.yellow { background: #f9a825 !important; }
       .risk-table td.green  { background: #43a047 !important; }
+      .risk-table td.blue   { background: #1976d2 !important; }
       .risk-table td.gray   { background: #9e9e9e !important; }
       .risk-table td.red .label,
       .risk-table td.yellow .label,
       .risk-table td.green .label,
+      .risk-table td.blue .label,
       .risk-table td.gray .label { color: #fff !important; }
       /* 编辑态的高亮/光标只属于屏幕交互，打印时还原 */
       .risk-table tr.custom-row { cursor: auto; }
@@ -588,9 +594,9 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
     }
     // R3C2 防压疮
     cells[2][1] = { text: '防压疮', level: level('pressure') };
-    // R4C1 饮食：strVal 非空 → 饮食：<值> 红底；否则灰底
+    // R4C1 饮食：strVal 非空（满足）→ 饮食：<值> 绿底白字；否则灰底
     const dietVal = String(latest.get('diet') ?? '').trim();
-    cells[3][0] = dietVal ? { text: `饮食：${dietVal}`, level: 'red' } : { text: '饮食', level: 'gray' };
+    cells[3][0] = dietVal ? { text: `饮食：${dietVal}`, level: 'green' } : { text: '饮食', level: 'gray' };
     // R4C2 防误吸
     cells[3][1] = { text: '防误吸', level: level('aspiration') };
     // R5C1 VTE：临床诊断含"深静脉血栓" → 红底
@@ -598,8 +604,8 @@ export class BedsideRiskCardComponent implements OnInit, OnDestroy {
     cells[4][0] = { text: 'VTE', level: diagnosis.includes('深静脉血栓') ? 'red' : 'gray' };
     // R5C2 防意外拔管
     cells[4][1] = { text: '防意外拔管', level: level('extubation') };
-    // R6C1 接触隔离：医嘱无停止时间/未到期 → 红底
-    cells[5][0] = { text: '接触隔离', level: extra?.contactIsolation ? 'red' : 'gray' };
+    // R6C1 接触隔离：医嘱无停止时间/未到期（满足）→ 蓝底白字
+    cells[5][0] = { text: '接触隔离', level: extra?.contactIsolation ? 'blue' : 'gray' };
     // R6C2 保持空白
 
     this.cells = cells;

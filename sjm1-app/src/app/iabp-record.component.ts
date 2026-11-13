@@ -25,7 +25,6 @@ const IABP_GROUPS:IabpGroup[]=[
  {name:'参数设置',metrics:[
   {label:'操作模式（Q4H）',code:'param_触发模式'},
   {label:'触发信号（Q4H）',code:'param_触发信号'},
-  {label:'压力调整',code:'param_压力调整'},
   {label:'反搏辅助频率（Q4H）',code:'param_反博辅助频率'},
  ]},
  {name:'传感器',metrics:[
@@ -46,6 +45,7 @@ const IABP_GROUPS:IabpGroup[]=[
   {label:'穿刺侧肢体远端情况（Q4H）',code:'param_穿刺侧肢体远端肢体有无紫绀及肿胀'},
  ]},
  {name:'其它',metrics:[{label:'氮气瓶压力充足（Q4H）',code:'param_氮气瓶压力是否充足'}]},
+ {name:'备注',metrics:[{label:'压力调整',code:'param_压力调整'}]},
 ];
 
 @Component({selector:'app-iabp-record',standalone:false,templateUrl:'./iabp-record.component.html',styleUrls:['./iabp-record.component.css']})

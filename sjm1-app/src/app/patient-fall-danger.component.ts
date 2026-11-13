@@ -293,7 +293,7 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
     .result-datetime{box-sizing:border-box;width:190px;height:28px;padding:2px 5px;border:1px solid #999;border-radius:3px;background:#fff;color:#000;font:inherit}
     .result-line input[type="radio"]{width:14px;height:14px;margin:0 3px 0 10px;vertical-align:middle}
 
-    .footnote { margin-top:6px; font-family:'SimSun','宋体',serif; font-size:9.5pt; line-height:1.3; text-align:left; margin-bottom:10mm; }
+    .footnote { margin-top:6px; font-family:'SimSun','宋体',serif; font-size:9.5pt; line-height:1.3; text-align:left; margin-bottom:5mm; }
     .footnote .fn-title { font-weight:700; } .footnote .fn { margin:1px 0; }
     .review-sign { margin-top:6px; text-align:right; font-family:'SimSun','宋体',serif; font-size:13pt; font-weight:400; padding-right:6px; }
     .sheet-pageno { position:absolute; right:0; bottom:35px; left:0; width:auto; margin:0; padding:0; box-sizing:border-box; text-align:center; font-family:'SimSun','宋体',serif; font-size:12pt; font-weight:400; line-height:1; color:#000; white-space:nowrap; pointer-events:none; z-index:20; }
@@ -785,7 +785,7 @@ export class PatientFallDangerComponent implements OnInit, AfterViewInit, OnDest
       .result-line{display:flex;flex-wrap:wrap;gap:80px;margin-top:8px;align-items:center;font-family:'SimSun','宋体',serif;font-size:12pt;}
       .rl-item{display:inline-flex;align-items:center;} .screen-only{display:none !important;} .print-only{display:inline !important;}
       .fill-val{display:inline-block;min-width:0;border:0!important;border-bottom:0!important;padding:0 4px;box-shadow:none!important;background:transparent!important;text-decoration:none!important;}
-      .footnote{font-family:'SimSun','宋体',serif;font-size:8pt;line-height:1.3;text-align:left;margin-bottom:10mm;} .footnote .fn-title{font-weight:700;} .footnote .fn{margin:1px 0;}
+      .footnote{font-family:'SimSun','宋体',serif;font-size:8pt;line-height:1.3;text-align:left;margin-bottom:5mm;} .footnote .fn-title{font-weight:700;} .footnote .fn{margin:1px 0;}
       .review-sign{margin-top:6px;text-align:right;font-family:'SimSun','宋体',serif;font-size:12pt;font-weight:400;padding-right:6px;} .sheet-pageno{position:absolute;right:0;bottom:35px;left:0;width:auto;margin:0;padding:0;box-sizing:border-box;text-align:center;font-family:'SimSun','宋体',serif;font-size:12pt;font-weight:400;line-height:1;color:#000;white-space:nowrap;pointer-events:none;z-index:20;}
     `;
     const win = window.open('', '_blank', 'width=1400,height=900');

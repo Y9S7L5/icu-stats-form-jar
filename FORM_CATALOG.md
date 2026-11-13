@@ -9,7 +9,7 @@
 | 亚低温治疗体温记录单 | /form/ydwzlForm | YdwzlTemperatureComponent | /api/v1/icu/bedside/listByPid, /api/v1/icu/ydwzl-extra | Bedside, YdwzlFormExtra | 是 |
 | 肠内营养耐受性评分表 | /form/toleranceForm | ToleranceScoreComponent | /api/v1/icu/scores | Score | 是 |
 | 自杀风险评估表（NGASR） | /form/commitSuicideForm | CommitSuicideScoreComponent | /api/v1/icu/scores | Score | 是 |
-| 失禁相关性皮炎（IAD）评估记录单 | /form/IADForm | IadScoreComponent | /api/v1/icu/scores | Score | 是 |
+| 失禁相关性皮炎（IAD）评估记录单 | /form/IADForm | IadScoreComponent | /api/v1/icu/scores, /api/v1/icu/fall-danger-extra | Score, FallDangerFormExtra | 是 |
 | 住院患者日常生活能力评估单（Barthel） | /form/baetheiForm | BaetheiScoreComponent | /api/v1/icu/scores, /api/v1/icu/self-care-extra | Score, SelfCareFormExtra | 是 |
 | 跌倒/坠床风险评估及预防措施记录单 | /form/patientFallDangerForm | PatientFallDangerComponent | /api/v1/icu/scores, /api/v1/icu/fall-danger-extra | Score, FallDangerFormExtra | 是 |
 | 健康教育记录单 | /form/jkjyForm | HealthEducationComponent | /api/v1/icu/health-education | HealthEducationRecord | 是 |
