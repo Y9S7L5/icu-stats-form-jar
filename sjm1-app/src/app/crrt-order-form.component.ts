@@ -159,6 +159,8 @@ export class CrrtOrderFormComponent implements OnInit, OnDestroy {
   isAdminRole(): boolean { return ADMIN_PROFS.includes(this.profession); }
   canEditDoctorField(): boolean { return this.isFormActive() && (this.isDoctorRole() || this.isAdminRole()); }
   canEditNurseField(): boolean { return this.isFormActive() && (this.isNurseRole() || this.isAdminRole()); }
+  /* 删除权限：仅医生可删除医嘱单/医嘱内容 */
+  canDeleteRecord(): boolean { return this.isDoctorRole(); }
   isFormActive(): boolean { return this.isDraft || !!this.record.id; }
   private currentAccountId(): string { return String(this.account?.id ?? this.account?._id ?? this.account?.accountId ?? '').trim(); }
   genderText(g?: string|number): string { const v = String(g ?? '').trim(); if (['Male','M','男','1'].includes(v)) return '男'; if (['Female','F','女','2'].includes(v)) return '女'; return v; }
@@ -340,6 +342,7 @@ export class CrrtOrderFormComponent implements OnInit, OnDestroy {
   deleteCurrentRecord(): void {
     const id = this.record?.id || this.selectedRecordId;
     if (!id || this.deleting || this.creating || this.switchingRecord) return;
+    if (!this.canDeleteRecord()) { alert('没有权限，仅医生可删除 CRRT 医嘱单'); return; }
     const timeText = this.displayTime(this.record?.orderTime);
     if (!confirm(`确认删除${timeText ? ` ${timeText} 的` : ''}CRRT 医嘱单？删除后不可恢复。`)) return;
     const operatorId = this.currentAccountId();
@@ -516,7 +519,14 @@ export class CrrtOrderFormComponent implements OnInit, OnDestroy {
     target[key] = acc ? { accountId: acc.accountId, accountName: acc.accountName, signedAt: new Date().toISOString() } : null;
   }
   addOrderItem(): void { this.record.orderItems.push(this.createEmptyOrderItem()); this.onPageChanged(); }
-  removeOrderItem(i: number): void { if (this.record.orderItems.length <= 1) return; this.record.orderItems.splice(i, 1); this.onPageChanged(); }
+  removeOrderItem(i: number): void {
+    if (this.record.orderItems.length <= 1) return;
+    if (!this.canDeleteRecord()) { alert('没有权限，仅医生可删除医嘱内容'); return; }
+    const content = String(this.record.orderItems[i]?.content ?? '').trim();
+    if (!confirm(`确认删除${content ? `「${content}」` : '该条'}医嘱内容？删除后不可恢复。`)) return;
+    this.record.orderItems.splice(i, 1);
+    this.onPageChanged();
+  }
   trackByIndex(index: number): number { return index; }
   private dateTimeParts(value: string | null | undefined): { date: string; time: string } {
     if (!value) return { date: '', time: '' };

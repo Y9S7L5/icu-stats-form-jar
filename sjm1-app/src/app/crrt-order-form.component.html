@@ -2,7 +2,7 @@
   <div class="toolbar-left">
     <label class="ps">医嘱时间：<select [ngModel]="selectedRecordId" (ngModelChange)="onTimeChange($event)" [disabled]="loading || switchingRecord || creating || printingAll"><option value="">{{ timeOptions.length ? '请选择' : '暂无' }}</option><option *ngFor="let o of timeOptions" [value]="o.id">{{ orderTimeOptionLabel(o) }}</option></select></label>
     <button type="button" class="btn primary" [disabled]="loading || switchingRecord || creating || printingAll || !pid" (click)="openCreateDialog()">新增</button>
-    <button type="button" class="btn danger" [disabled]="loading || switchingRecord || creating || deleting || printingAll || !selectedRecordId" (click)="deleteCurrentRecord()">{{ deleting ? '删除中…' : '删除' }}</button>
+    <button *ngIf="canDeleteRecord()" type="button" class="btn danger" [disabled]="loading || switchingRecord || creating || deleting || printingAll || !selectedRecordId" (click)="deleteCurrentRecord()">{{ deleting ? '删除中…' : '删除' }}</button>
   </div>
   <div class="toolbar-right">
     <span class="as"><ng-container [ngSwitch]="autoSaveState"><span *ngSwitchCase="'dirty'">未保存</span><span *ngSwitchCase="'saving'">保存中…</span><span *ngSwitchCase="'saved'" class="ok">已自动保存</span><button *ngSwitchCase="'error'" class="retry" (click)="retryAutoSave()">自动保存失败，重试</button></ng-container></span>
@@ -319,7 +319,7 @@
             <td><select class="screen-only" [ngModel]="item.doctorSignature?.accountId || ''" [disabled]="!canEditDoctorField()" (ngModelChange)="updateSignature(item,'doctorSignature',$event,doctorAccounts);onDiscreteChange()"><option value="">请选择</option><option *ngFor="let a of orderedDoctorAccounts" [value]="a.accountId">{{ a.accountName }}</option></select><span class="print-only print-field-value">{{ item.doctorSignature?.accountName || '' }}</span></td>
             <td class="datetime-cell" [class.datetime-cell-disabled]="!canEditNurseField()" (pointerdown)="openDateTimePicker(orderExecPicker, $event)"><div class="datetime-value"><span>{{ datePart(item.executionTime) }}</span><span>{{ timePart(item.executionTime) }}</span></div><input #orderExecPicker class="datetime-picker" type="datetime-local" [(ngModel)]="item.executionTime" [disabled]="!canEditNurseField()" (ngModelChange)="onDiscreteChange()" aria-label="执行时间" /></td>
             <td><select class="screen-only" [ngModel]="item.nurseSignature?.accountId || ''" [disabled]="!canEditNurseField()" (ngModelChange)="updateSignature(item,'nurseSignature',$event,nurseAccounts);onDiscreteChange()"><option value="">请选择</option><option *ngFor="let a of orderedNurseAccounts" [value]="a.accountId">{{ a.accountName }}</option></select><span class="print-only print-field-value">{{ item.nurseSignature?.accountName || '' }}</span></td>
-            <td class="temp-action-cell screen-only"><button type="button" class="btn danger-small" (click)="removeOrderItem(i)" [disabled]="order.orderItems.length <= 1">删除</button></td>
+            <td class="temp-action-cell screen-only"><button *ngIf="canDeleteRecord()" type="button" class="btn danger-small" (click)="removeOrderItem(i)" [disabled]="order.orderItems.length <= 1">删除</button></td>
           </tr>
         </tbody>
       </table>
