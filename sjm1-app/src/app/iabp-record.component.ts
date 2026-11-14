@@ -101,7 +101,7 @@ export class IabpRecordComponent implements OnInit,OnDestroy{
    const ok=r.valid===true||r.valid===1||r.valid==='1'||String(r.valid).toLowerCase()==='true';
    if(!ok||pid!==this.pid||!time)return;
    if(code==='param_Yishi'){const user=this.nm(r.editUser);if(user){this.signatureRecords.push({time,instant:databaseTimeValue(time),editUser:user});editUserIds.add(user);}}
-   else if(allowed.has(code)){this.values.set(`${code}@@${time}`,this.nm(r.strVal));timeSet.add(time);}
+   else if(allowed.has(code)){const value=this.nm(r.strVal);if(!value)return;this.values.set(`${code}@@${time}`,value);timeSet.add(time);}
   });
   this.signatureRecords.sort((a,b)=>a.instant-b.instant);
   const times=[...timeSet].sort((a,b)=>databaseTimeValue(a)-databaseTimeValue(b));
