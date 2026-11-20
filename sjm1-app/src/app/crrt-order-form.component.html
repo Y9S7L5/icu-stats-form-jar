@@ -21,6 +21,10 @@
 
 <ng-template #patientInformation let-order>
   <div class="patient-info" *ngIf="getPatientHeader(order) as hdr">
+    <div class="patient-info-row session-row" *ngIf="sessionIndexOfRecordId(order.id) as sessionNo">
+      <span class="info-item session-item"><b>治疗场次：</b>第 {{ sessionNo }} 场</span>
+      <span class="info-item session-item" *ngIf="displayTime(order.orderTime) as startTime"><b>开始时间：</b>{{ startTime }}</span>
+    </div>
     <div class="patient-info-row">
       <span class="info-item"><b>科室：</b>{{ hdr.department }}</span>
       <span class="info-item"><b>姓名：</b>{{ hdr.patientName }}</span>
