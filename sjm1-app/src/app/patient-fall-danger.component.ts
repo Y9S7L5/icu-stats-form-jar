@@ -9,7 +9,6 @@ import { catchError, distinctUntilChanged, filter, finalize, map, switchMap, tak
 import { HostPatientService } from './services/host-patient.service';
 import { IcuFormViewerContextService } from './icu-form-viewer-context.service';
 import { databaseTimeValue, formatShanghaiDate, formatShanghaiTime } from './form-date.util';
-import { measureRowCapacity } from './form-measure.util';
 import { normalizePrintPages, shouldPrintPage } from './form-print-pages.util';
 import { firstDiagnosisSegment, resolvePageDiagnosis } from './diagnosis-history.util';
 import { DiagnosisHistoryService } from './diagnosis-history.service';
@@ -300,12 +299,24 @@ interface FinalExtraData { id: string | null; result: string; resultDate: string
     @media screen { .sheet { zoom:var(--sheet-scale,1); } }
     @media print {
       :host { height:auto; overflow:visible; }
+      /* 本组件打印必须横版；打印中心/直接 Ctrl+P 走本样式时同样生效 */
+      @page { size: A4 landscape; margin: 0; }
       .no-print { display:none !important; }
       .screen-only { display:none !important; } .print-only { display:inline !important; }
       .result-combo,.result-datetime,.result-line input[type="radio"]{display:none!important}
       .sheet-hidden { display:none !important; }
-      .sheet { width:297mm; height:210mm; overflow:hidden; margin:0; box-shadow:none; zoom:1; page-break-after:always; }
+      .sheet { width:297mm; height:210mm; overflow:hidden; margin:0; padding:4mm 10mm 12mm; box-shadow:none; zoom:1; page-break-after:always; }
       .sheet:last-of-type { page-break-after:auto; }
+      /*
+       * 与弹窗打印（onPrint 内嵌 CSS）一致的紧凑版式：
+       * 表头/页脚字体压缩 + 日期行高 1.0，使 11 行数据 + 备注 + 审核护士签名 + 页码
+       * 完整落在 210mm 内（修复审核护士签名被裁）。
+       */
+      .title-line { font-size:22pt; }
+      .patient-info-row { font-size:12pt; }
+      .dt-date,.dt-time { line-height:1.0; }
+      .footnote { font-size:8pt; }
+      .review-sign { font-size:12pt; }
     }
   `],
 })
@@ -465,24 +476,16 @@ export class PatientFallDangerComponent implements OnInit, AfterViewInit, OnDest
     return out.join(' ');
   }
 
-  private async autoPaginate(): Promise<void> {
-    try {
-      const title = this.hospitalName + '跌倒/坠床风险评估及预防措施护理记录单';
-      const fixedHtml = '<div class="sheet-head"><div class="title-line">' + title + '</div></div>' +
-        '<div class="patient-info-row"><span class="info-item"><b>科室：</b>' + (this.patient?.dept || '') + '</span></div>' +
-        '<table class="record-table"><thead><tr><th class="date-col" rowspan="4">日期/时间</th>' +
-        '<th colspan="2">适用方法</th><th colspan="7">临床判定法</th>' +
-        '<th colspan="2">Morse评分量表</th><th class="risk-col" rowspan="4">跌倒风险</th>' +
-        '<th class="measure-col" rowspan="4">预防措施</th><th class="sign-col" rowspan="4">签名</th></tr></thead></table>' +
-        '<div class="footnote"><div class="fn-title">预防跌倒护理措施：</div></div>' +
-        '<div class="review-sign">审核护士签名：</div>';
-      const rowHtml = '<table class="record-table"><tr><td class="date-cell"><span class="dt-date">2026-01-01</span>' +
-        '<span class="dt-time">12:00:00</span></td><td></td><td></td>' +
-        '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
-        '<td></td><td></td><td></td><td></td><td></td></tr></table>';
-      const capacity = await measureRowCapacity(fixedHtml, rowHtml, { safetyMargin: 8 });
-      this.maxRowsPerPage = 11;
-    } catch(e) { /* keep fallback */ }
+  private autoPaginate(): void {
+    /*
+     * 每页固定 11 行。依据（无头Chrome对弹窗打印版式的实测）：
+     * 打印页 210mm(794px)、上下内边距 4+12mm → 内容区 733px；
+     * 压缩日期行高前整页内容底部约 829px、溢出 35px（正好裁掉审核护士签名）；
+     * 压缩后约 763px、底部余量约 31px，备注/审核签名/页码完整落页。
+     * 行数超过 11 时 paginate() 自动分页，不会靠 overflow:hidden 硬裁。
+     * （原 measureRowCapacity 调用测的是未加组件样式的裸 HTML、返回值也从未被使用，已移除。）
+     */
+    this.maxRowsPerPage = 11;
     this.paginate();
     this.cdr.detectChanges();
   }
@@ -781,7 +784,7 @@ export class PatientFallDangerComponent implements OnInit, AfterViewInit, OnDest
       .opt-col{width:24px;height:50px;writing-mode:vertical-lr;text-orientation:upright;font-family:'SimSun','宋体',serif;font-size:9pt;font-weight:700;color:#000;}
       .opt-wide{width:34px;}
       .score-col{width:24px;font-family:'SimSun','宋体',serif;font-size:9pt;} .total-col{width:22px;} .risk-col{width:44px;} .measure-col{width:92px;} .sign-col{width:44px;}
-      .dt-date,.dt-time{display:block;white-space:nowrap;line-height:1.25;} .measure-cell{text-align:left;padding-left:4px;letter-spacing:2px;}
+      .dt-date,.dt-time{display:block;white-space:nowrap;line-height:1.0;} .measure-cell{text-align:left;padding-left:4px;letter-spacing:2px;}
       .result-line{display:flex;flex-wrap:wrap;gap:80px;margin-top:8px;align-items:center;font-family:'SimSun','宋体',serif;font-size:12pt;}
       .rl-item{display:inline-flex;align-items:center;} .screen-only{display:none !important;} .print-only{display:inline !important;}
       .fill-val{display:inline-block;min-width:0;border:0!important;border-bottom:0!important;padding:0 4px;box-shadow:none!important;background:transparent!important;text-decoration:none!important;}
@@ -792,7 +795,14 @@ export class PatientFallDangerComponent implements OnInit, AfterViewInit, OnDest
     if (!win) { alert('打印窗口被拦截，请允许弹出窗口'); return; }
     win.document.write('<html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' + body + '</body></html>');
     win.document.close(); win.focus();
-    const doPrint = () => { win.focus(); win.print(); };
+    const doPrint = () => {
+      // 打印前自检：内容超过 210mm 会被 .sheet overflow:hidden 静默裁掉（历史上审核护士签名被裁即此原因）
+      win.document.querySelectorAll<HTMLElement>('.sheet').forEach((s, i) => {
+        const overflow = s.scrollHeight - s.clientHeight;
+        if (overflow > 1) { console.warn(`[fallDanger] 打印第${i + 1}页纵向溢出 ${overflow}px，页脚可能被裁`); }
+      });
+      win.focus(); win.print();
+    };
     const ready = () => { const doc = win.document as any; if (doc.fonts?.ready) { doc.fonts.ready.then(() => { requestAnimationFrame(() => requestAnimationFrame(doPrint)); }); } else { requestAnimationFrame(() => requestAnimationFrame(doPrint)); } };
     win.addEventListener('afterprint', () => { try { win.close(); } catch(e) {} });
     if ((win.document as any).readyState === 'complete') { ready(); } else { win.addEventListener('load', ready); }
