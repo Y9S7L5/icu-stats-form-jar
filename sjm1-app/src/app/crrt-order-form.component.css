@@ -1133,6 +1133,7 @@ label {
 .prescription-grid input:focus,
 .prescription-grid select:focus,
 .order-table input:focus,
+.order-table textarea:focus,
 .order-table select:focus {
   outline: 1px solid #2783de;
   outline-offset: -1px;
@@ -1147,6 +1148,7 @@ label {
 .prescription-grid input:disabled,
 .prescription-grid select:disabled,
 .order-table input:disabled,
+.order-table textarea:disabled,
 .order-table select:disabled {
   opacity: 1;
   color: #000;
@@ -1179,6 +1181,25 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * 医嘱内容列 textarea：长文本换行完整展示。
+ * 高度由组件 JS 按内容重算（见 crrt-order-form.component.ts autoResizeTextarea），
+ * 这里只负责换行行为与禁用滚动条。
+ */
+.order-table textarea {
+  display: block;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 打印保留手动换行，长串（无空格英文/数字）也可断行 */
+.print-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* =========================================================

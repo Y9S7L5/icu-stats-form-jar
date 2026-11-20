@@ -1,4 +1,4 @@
-import { Component, ChangeDetectorRef, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, Component, ChangeDetectorRef, ElementRef, NgZone, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin, of, firstValueFrom, Subject } from 'rxjs';
 import { catchError, finalize, map, switchMap, takeUntil } from 'rxjs/operators';
@@ -47,13 +47,16 @@ const ADMIN_PROFS = ['systemadmin', 'admin'];
   standalone: false, selector: 'app-crrt-order-form',
   templateUrl: './crrt-order-form.component.html', styleUrls: ['./crrt-order-form.component.css'],
 })
-export class CrrtOrderFormComponent implements OnInit, OnDestroy {
+export class CrrtOrderFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   readonly apiUrl = '/api/v1/icu/crrt-orders';
 
   patient: any = null; account: any = null;
   pid = ''; age: number | null = null; diagnosisDisplay = '';
-  record: CrrtOrderFormRecord = this.createEmptyRecord();
+  private _record: CrrtOrderFormRecord = this.createEmptyRecord();
+  get record(): CrrtOrderFormRecord { return this._record; }
+  /** 整体替换记录（加载/切换场次/自动保存回填）时 *ngFor 按 index 复用视图，文本变了行高不会自动变，需重算医嘱内容行高 */
+  set record(value: CrrtOrderFormRecord) { this._record = value; this.resizeOrderContentTextareas(); }
   timeOptions: OrderTimeOption[] = [];
   selectedRecordId = '';
   doctorAccounts: AccountOption[] = [];
@@ -151,6 +154,36 @@ export class CrrtOrderFormComponent implements OnInit, OnDestroy {
   private readonly afterPrintHandler = (): void => {
     this.ngZone.run(() => this.resetPrintState());
   };
+
+  /* ==================== 医嘱内容 textarea 自动高度 ==================== */
+
+  @ViewChildren('orderContentTa') private orderContentTextareas?: QueryList<ElementRef<HTMLTextAreaElement>>;
+
+  ngAfterViewInit(): void {
+    this.resizeOrderContentTextareas();
+    this.orderContentTextareas?.changes.pipe(takeUntil(this.destroy$)).subscribe(() => this.resizeOrderContentTextareas());
+  }
+
+  /** 单个医嘱内容框：高度收缩/扩张到内容实际高度；下限取所在单元格内容区高度，保证整行都点得到。 */
+  autoResizeTextarea(textarea: HTMLTextAreaElement | null): void {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    let floor = parseFloat(getComputedStyle(textarea).minHeight) || 22;
+    const cell = textarea.parentElement;
+    if (cell) {
+      const cs = getComputedStyle(cell);
+      const inner = cell.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      if (inner > floor) floor = inner;
+    }
+    textarea.style.height = `${Math.max(textarea.scrollHeight, floor)}px`;
+  }
+
+  /** 等 Angular 把最新文本渲染进 DOM 后统一重算（rAF 保证读到的是最终布局）。 */
+  private resizeOrderContentTextareas(): void {
+    requestAnimationFrame(() => {
+      this.orderContentTextareas?.forEach(ref => this.autoResizeTextarea(ref.nativeElement));
+    });
+  }
 
   /* 权限 */
   get profession(): string { return String(this.account?.profession ?? '').trim().toLowerCase(); }
