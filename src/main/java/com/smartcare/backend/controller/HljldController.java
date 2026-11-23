@@ -39,12 +39,13 @@ public class HljldController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date startTime,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date endTime) {
         // 区间相交：跨 07:00 仍在执行的持续用药必须取回，否则本护理日会漏算
+        // endTime 用 gte：零时长记录(startTime==endTime)恰好落在窗口起点时 gt 会漏掉
         Criteria overlap = new Criteria().andOperator(
                 Criteria.where("startTime").lte(endTime),
                 new Criteria().orOperator(
                         Criteria.where("endTime").exists(false),
                         Criteria.where("endTime").is(null),
-                        Criteria.where("endTime").gt(startTime)));
+                        Criteria.where("endTime").gte(startTime)));
 
         Query query = new Query(Criteria.where("pid").is(pid)
                 .and("status").ne("invalid")

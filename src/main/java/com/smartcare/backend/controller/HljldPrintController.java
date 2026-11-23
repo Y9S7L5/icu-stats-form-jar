@@ -113,13 +113,14 @@ public class HljldPrintController {
     }
 
     private List<Document> loadDrugExecutions(String pid, Date start, Date end) {
-        // 区间相交：用药开始 ≤ 窗口结束 AND 用药结束 > 窗口开始
+        // 区间相交：用药开始 ≤ 窗口结束 AND 用药结束 ≥ 窗口开始
+        // endTime 用 gte：零时长记录(startTime==endTime)恰好落在窗口起点时 gt 会漏掉
         Criteria overlap = new Criteria().andOperator(
                 Criteria.where("startTime").lte(end),
                 new Criteria().orOperator(
                         Criteria.where("endTime").exists(false),
                         Criteria.where("endTime").is(null),
-                        Criteria.where("endTime").gt(start)));
+                        Criteria.where("endTime").gte(start)));
         Query q = new Query(Criteria.where("pid").is(pid)
                 .and("status").ne("invalid")
                 .andOperator(overlap));

@@ -129,12 +129,14 @@ public class HljldNursingDayLoader {
 
     private List<Document> loadDrugExecutions(String pid, Date start, Date end) {
         // 区间相交：跨07:00仍在执行的持续用药必须取回
+        // endTime 用 gte：零时长记录(startTime==endTime)恰好落在护理日07:00起点时，
+        // gt(start) 会漏掉，导致该记录在前后两个护理日都取不到（22号右开过滤、23号查询漏掉）
         Criteria overlap = new Criteria().andOperator(
             Criteria.where("startTime").lte(end),
             new Criteria().orOperator(
                 Criteria.where("endTime").exists(false),
                 Criteria.where("endTime").is(null),
-                Criteria.where("endTime").gt(start)));
+                Criteria.where("endTime").gte(start)));
         Query q = new Query(Criteria.where("pid").is(pid)
             .and("status").ne("invalid")
             .andOperator(overlap));
