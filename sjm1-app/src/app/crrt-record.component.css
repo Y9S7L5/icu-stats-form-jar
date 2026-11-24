@@ -108,6 +108,70 @@ label {
   color: #fff;
 }
 
+/* =========================================================
+   审核护士签名下拉（工具栏，参考 braden-form）
+   ========================================================= */
+.auditor-field {
+  display: flex;
+  align-items: center;
+}
+
+.auditor-label {
+  font: 14px "SimSun", "宋体", serif;
+  white-space: nowrap;
+}
+
+.auditor-combo {
+  position: relative;
+  display: inline-block;
+}
+
+.auditor-input {
+  box-sizing: border-box;
+  width: 150px;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.auditor-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  margin: 2px 0 0;
+  padding: 4px 0;
+  max-height: 240px;
+  overflow-y: auto;
+  list-style: none;
+  background: #fff;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.auditor-opt {
+  padding: 5px 10px;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.auditor-opt:hover {
+  background: #f0f7ff;
+}
+
+.auditor-opt.empty-opt,
+.auditor-opt.no-opt {
+  color: #999;
+}
+
+.auditor-opt.no-opt {
+  cursor: default;
+}
+
 .btn:disabled,
 .session-select select:disabled,
 .page-select select:disabled {
@@ -390,6 +454,21 @@ h1 {
   font-weight: 400;
   line-height: 1;
   text-align: center;
+  white-space: nowrap;
+}
+
+/* 末页审核护士签名：与页码同一基线、左对齐（页码居中不冲突）。
+   绝对定位不占文档流 → 不影响 table.offsetTop 测量与行高纯数值公式。 */
+.review-sign {
+  position: absolute;
+  left: 0;
+  bottom: 30px;
+  margin: 0;
+  color: #000;
+  font-family: "SimSun", "宋体", serif;
+  font-size: 12pt;
+  font-weight: 400;
+  line-height: 1;
   white-space: nowrap;
 }
 

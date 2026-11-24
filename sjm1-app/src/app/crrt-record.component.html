@@ -18,8 +18,21 @@
     </label>
   </div>
 
-  <!-- 右侧：页码和打印 -->
+  <!-- 右侧：审核签名、页码和打印 -->
   <div class="toolbar-right">
+    <span class="auditor-field">
+      <span class="auditor-label">审核护士签名：</span>
+      <span class="auditor-combo">
+        <input class="auditor-input" type="text" [(ngModel)]="auditorQuery"
+               [placeholder]="auditorName || '搜索并选择'"
+               (focus)="onAuditorFocus()" (blur)="onAuditorBlur()" />
+        <ul class="auditor-menu" *ngIf="auditorOpen">
+          <li class="auditor-opt empty-opt" (mousedown)="onClearAuditorMouseDown($event)">（空）</li>
+          <li class="auditor-opt" *ngFor="let a of filteredAccounts" (mousedown)="onAuditorOptionMouseDown($event, a)">{{ a.accountName }}</li>
+          <li class="auditor-opt no-opt" *ngIf="filteredAccounts.length === 0">无匹配账号</li>
+        </ul>
+      </span>
+    </span>
     <app-print-page-multi-select
       [totalPages]="pages.length"
       [(selectedPages)]="selectedPrintPages"
@@ -81,6 +94,7 @@
       </tbody>
     </table>
 
+    <div class="review-sign" *ngIf="page.index === pages.length">审核护士签名：{{ auditorName || '__________' }}</div>
     <div class="sheet-pageno">第 {{page.index}} 页</div>
   </section>
 </div>

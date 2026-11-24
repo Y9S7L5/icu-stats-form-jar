@@ -10,6 +10,12 @@ import { firstDiagnosisSegment, resolveBlankDiagnosis, resolveDiagnosisDisplay }
 import { DiagnosisHistoryService } from './diagnosis-history.service';
 
 interface BedsideRecord { pid: string|number; code: string; time: string; strVal?: string; valid: boolean|string|number; editUser?: string; }
+
+/** 审核护士签名持久化（复用 fall-danger-extra，按 pid+formCode 区分表单） */
+const FORM_CODE = 'crrtForm';
+const API_EXTRA_LATEST = '/api/v1/icu/fall-danger-extra/latest';
+const API_EXTRA_SAVE = '/api/v1/icu/fall-danger-extra/save';
+const API_ACCOUNT_ALL = '/api/v1/icu/accounts';
 interface CrrtMetric { label: string; code: string; unit?: string; }
 interface CrrtGroup { name: string; metrics: CrrtMetric[]; }
 interface TimePoint { instant: number; rawTime: string; }
@@ -142,6 +148,12 @@ export class CrrtRecordComponent implements OnInit, OnDestroy, AfterViewChecked 
   // Viewer 模式标志
   isViewerMode = false;
 
+  // 审核者签名
+  auditorName = ''; auditorId = ''; auditorQuery = ''; auditorOpen = false;
+  accountList: { accountId: string; accountName: string }[] = [];
+  private blurTimer: any = null;
+  private readonly AUDITOR_BLOCK = ['工程师', '美康', '他科带入', '外院带入', '其他账号'];
+
   constructor(private host: ElementRef<HTMLElement>, private http: HttpClient, private hostPatient: HostPatientService, private cdr: ChangeDetectorRef, private contextService: IcuFormViewerContextService, private diagHistory: DiagnosisHistoryService) {}
 
   ngOnInit(): void {
@@ -154,6 +166,7 @@ export class CrrtRecordComponent implements OnInit, OnDestroy, AfterViewChecked 
     });
 
     this.hostPatient.account$.pipe(takeUntil(this.destroy$)).subscribe(a => this.account = a);
+    this.loadAccountList();
     this.hostPatient.patient$.pipe(
       takeUntil(this.destroy$),
       switchMap(p => {
@@ -169,7 +182,12 @@ export class CrrtRecordComponent implements OnInit, OnDestroy, AfterViewChecked 
       this.patient = p; this.pid = next;
       this.age = this.calcAge(p.birthday);
       this.diagnosisDisplay = this.formatDiagnosis(p.clinicalDiagnosis);
-      if (next !== prev) { this.values.clear(); this.yishiRecords = []; this.accountNameMap.clear(); this.sessions = []; this.selectedSession = null; this.selectedSessionId = null; this.visibleGroupsForSession = []; this.selectedPrintPages = []; this.load(); }
+      if (next !== prev) {
+        this.values.clear(); this.yishiRecords = []; this.accountNameMap.clear(); this.sessions = []; this.selectedSession = null; this.selectedSessionId = null; this.visibleGroupsForSession = []; this.selectedPrintPages = [];
+        this.auditorName = ''; this.auditorId = ''; this.auditorQuery = ''; this.auditorOpen = false;
+        this.loadAuditor();
+        this.load();
+      }
     });
   }
 
@@ -237,7 +255,7 @@ export class CrrtRecordComponent implements OnInit, OnDestroy, AfterViewChecked 
     }
     return `--crrt-row-px:${perPx.toFixed(1)}px;--crrt-row-mm:${(perPx / PX_PER_MM).toFixed(3)}mm`;
   }
-  private reset(): void { this.pid = ''; this.patient = null; this.values.clear(); this.yishiRecords = []; this.accountNameMap.clear(); this.sessions = []; this.selectedSession = null; this.selectedSessionId = null; this.visibleGroupsForSession = []; this.selectedPrintPages = []; }
+  private reset(): void { this.pid = ''; this.patient = null; this.values.clear(); this.yishiRecords = []; this.accountNameMap.clear(); this.sessions = []; this.selectedSession = null; this.selectedSessionId = null; this.visibleGroupsForSession = []; this.selectedPrintPages = []; this.auditorName = ''; this.auditorId = ''; this.auditorQuery = ''; this.auditorOpen = false; }
 
   load(): void {
     if (!this.pid) return;
@@ -498,6 +516,77 @@ export class CrrtRecordComponent implements OnInit, OnDestroy, AfterViewChecked 
     this.http.get<any[]>('/api/v1/icu/accounts/listByIds', { params }).pipe(takeUntil(this.destroy$)).subscribe({
       next: rows => { (Array.isArray(rows) ? rows : []).forEach(r => { const id = this.norm(r?.accountId ?? r?._id ?? r?.id); const name = this.norm(r?.accountName ?? r?.trueName ?? r?.name); if (id && name) this.accountNameMap.set(id, name); }); this.cdr.detectChanges(); },
       error: () => {},
+    });
+  }
+
+  /* ===== 审核者下拉（可检索 + 屏蔽 + 登录者置顶），参考 braden-form ===== */
+  private get baseAccounts() { return this.accountList.filter(a => a.accountName && !this.AUDITOR_BLOCK.includes(a.accountName.trim())); }
+  get orderedAccounts(): { accountId: string; accountName: string }[] {
+    const login = this.hostPatient.getAccount(); const loginName = (login?.trueName || '').trim();
+    const list = [...this.baseAccounts];
+    if (loginName && !this.AUDITOR_BLOCK.includes(loginName)) {
+      const idx = list.findIndex(a => a.accountName === loginName);
+      const opt = idx >= 0 ? list.splice(idx, 1)[0] : { accountId: login.username || login.accountId || login.id || '', accountName: loginName };
+      return [opt, ...list];
+    }
+    return list;
+  }
+  get filteredAccounts() {
+    const q = (this.auditorQuery || '').trim().toLowerCase();
+    const base = this.orderedAccounts;
+    return q ? base.filter(a => a.accountName.toLowerCase().includes(q)) : base;
+  }
+  onAuditorFocus(): void { if (this.blurTimer) { clearTimeout(this.blurTimer); this.blurTimer = null; } this.auditorOpen = true; this.auditorQuery = ''; }
+  onAuditorBlur(): void { this.blurTimer = setTimeout(() => { this.auditorOpen = false; this.auditorQuery = this.auditorName; this.cdr.detectChanges(); }, 150); }
+  onAuditorOptionMouseDown(event: MouseEvent, account: { accountId: string; accountName: string }): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectAuditor(account);
+  }
+  onClearAuditorMouseDown(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.clearAuditor();
+  }
+  selectAuditor(a: { accountId: string; accountName: string }): void { this.auditorName = a.accountName; this.auditorId = a.accountId; this.auditorQuery = a.accountName; this.auditorOpen = false; this.saveAuditor(); }
+  clearAuditor(): void { this.auditorName = ''; this.auditorId = ''; this.auditorQuery = ''; this.auditorOpen = false; this.saveAuditor(); }
+  private saveAuditor(): void {
+    if (!this.pid) return;
+    this.http.post(API_EXTRA_SAVE, {
+      pid: this.pid, formCode: FORM_CODE,
+      auditorId: this.auditorId, auditorName: this.auditorName,
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {},
+      error: (e) => console.error('[crrtRecord] saveAuditor failed', { formCode: FORM_CODE, pid: this.pid, auditorId: this.auditorId, error: e }),
+    });
+  }
+  private loadAuditor(): void {
+    if (!this.pid) return;
+    this.http.get<any>(API_EXTRA_LATEST, { params: { pid: this.pid, formCode: FORM_CODE } }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (d) => {
+        if (d) { this.auditorName = d.auditorName || ''; this.auditorId = d.auditorId || ''; }
+        this.auditorQuery = this.auditorName;
+        this.cdr.detectChanges();
+      },
+      error: () => this.cdr.detectChanges(),
+    });
+  }
+  private loadAccountList(): void {
+    this.http.get<any[]>(API_ACCOUNT_ALL).pipe(takeUntil(this.destroy$)).subscribe({
+      next: (list) => {
+        const seen = new Set<string>();
+        this.accountList = (Array.isArray(list) ? list : [])
+          .map(a => ({ accountId: a?.accountId || a?.username || a?.id || a?._id || '', accountName: a?.accountName || a?.trueName || a?.name || '' }))
+          .filter(a => a.accountName)
+          .filter(a => {
+            const key = (a.accountId || '') + '|' + a.accountName;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        this.cdr.detectChanges();
+      },
+      error: (e) => console.error('[crrtRecord] loadAccountList failed', e),
     });
   }
 
